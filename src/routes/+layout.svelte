@@ -5,12 +5,15 @@
 	import { setupConvex, useConvexClient } from 'convex-svelte';
 	import { authClient } from '$convex/model/authclient';
 
+	// const session = authClient.useSession()
+	// const isAuthenticated = $derived($session.data ? true : false)
+
 	setupConvex(PUBLIC_CONVEX_URL);
-	const convex = useConvexClient();
-	convex.setAuth(async () => {
-		const convexToken = await authClient.convex.token();
-		return convexToken.data?.token ?? '';
-	});
+	// const convex = useConvexClient();
+	// convex.setAuth(async () => {
+	// 	const convexToken = await authClient.convex.token();
+	// 	return convexToken.data?.token ?? '';
+	// });
 
 	let { children } = $props();
 </script>

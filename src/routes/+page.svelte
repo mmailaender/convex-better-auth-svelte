@@ -1,24 +1,33 @@
 <script lang="ts">
 	import { authClient } from '$convex/model/authclient';
 	import { api } from '../convex/_generated/api';
-	import { useQuery } from 'convex-svelte';
+	import { useConvexClient, useQuery } from 'convex-svelte';
+
+	const convex = useConvexClient();
 
 	// Auth state store
 	const isAuthenticatedResponse = useQuery(api.auth.isAuthenticated, {});
-    const isAuthenticated2 = authClient.useSession()
+	const isAuthenticated = authClient.useSession();
 	let authState = $derived(
-        $isAuthenticated2.isPending || $isAuthenticated2.isRefetching
-        ? 'loading'
-        : $isAuthenticated2.data
-        ? 'authenticated'
-        : 'unauthenticated'
+		isAuthenticatedResponse.isLoading
+			? 'loading'
+			: isAuthenticatedResponse.data
+				? 'authenticated'
+				: 'unauthenticated'
 	); // 'loading', 'authenticated', 'unauthenticated'
+	// let authState = $derived(
+	// 	$isAuthenticated.isPending || $isAuthenticated.isRefetching
+	// 		? 'loading'
+	// 		: $isAuthenticated.data
+	// 			? 'authenticated'
+	// 			: 'unauthenticated'
+	// ); // 'loading', 'authenticated', 'unauthenticated'
 
-    $inspect('isAuthenticated2', $isAuthenticated2.data)
-    $inspect('isAuthenticatedResponse', isAuthenticatedResponse);
-    $inspect('isAuthenticatedResponse.data', isAuthenticatedResponse.data);
+	$inspect('isAuthenticated', $isAuthenticated.data);
+	$inspect('isAuthenticatedResponse', isAuthenticatedResponse);
+	$inspect('isAuthenticatedResponse.data', isAuthenticatedResponse.data);
 
-    const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
+	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
 	let user = $derived(currentUserResponse.data);
 
 	// Sign in/up form state
@@ -38,6 +47,12 @@
 					{
 						onError: (ctx) => {
 							alert(ctx.error.message);
+						},
+						onSuccess: () => {
+							convex.setAuth(async () => {
+								const convexToken = await authClient.convex.token();
+								return convexToken.data?.token ?? '';
+							});
 						}
 					}
 				);
@@ -60,6 +75,7 @@
 	async function signOut() {
 		try {
 			await authClient.signOut();
+			convex.client.clearAuth();
 		} catch (error) {
 			console.error('Sign out error:', error);
 		}
@@ -75,10 +91,11 @@
 	}
 </script>
 
-<div class="flex flex-col items-center justify-center h-screen">
+<div class="flex h-screen flex-col items-center justify-center">
 	{#if authState === 'loading'}
 		<div>Loading...</div>
 	{:else if authState === 'unauthenticated'}
+		<div>Hello {user?.name}!</div>
 		<!-- Sign In Component -->
 		<form onsubmit={handleSubmit}>
 			{#if !showSignIn}
