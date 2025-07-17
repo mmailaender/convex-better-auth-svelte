@@ -17,7 +17,7 @@ export const betterAuthComponent = new BetterAuth(components.betterAuth, {
 export const { createUser, updateUser, deleteUser, createSession, isAuthenticated } =
 	betterAuthComponent.createAuthFunctions<DataModel>({
 		// Must create a user and return the user id
-		onCreateUser: async (ctx, user) => {
+		onCreateUser: async (ctx) => {
 			return ctx.db.insert('users', {});
 		},
 
@@ -39,9 +39,7 @@ export const getCurrentUser = query({
 		}
 		// Get user data from your application's database
 		// (skip this if you have no fields in your users table schema)
-		const user = await ctx.db.get(userMetadata.userId as Id<'users'>);
 		return {
-			...user,
 			...userMetadata
 		};
 	}
