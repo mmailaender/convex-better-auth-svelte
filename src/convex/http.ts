@@ -1,6 +1,6 @@
 import { httpRouter } from 'convex/server'
 import { betterAuthComponent } from './auth'
-import { createAuth } from './model/auth'
+import { createAuth } from '../lib/auth'
 
 const http = httpRouter()
 

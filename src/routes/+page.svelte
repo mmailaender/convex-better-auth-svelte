@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { authClient } from '$convex/model/authclient';
+	import { authClient } from '$lib/auth-client';
 	import { api } from '../convex/_generated/api';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
@@ -7,25 +7,8 @@
 
 	// Auth state store
 	const isAuthenticatedResponse = useQuery(api.auth.isAuthenticated, {});
-	const isAuthenticated = authClient.useSession();
-	let authState = $derived(
-		isAuthenticatedResponse.isLoading
-			? 'loading'
-			: isAuthenticatedResponse.data
-				? 'authenticated'
-				: 'unauthenticated'
-	); // 'loading', 'authenticated', 'unauthenticated'
-	// let authState = $derived(
-	// 	$isAuthenticated.isPending || $isAuthenticated.isRefetching
-	// 		? 'loading'
-	// 		: $isAuthenticated.data
-	// 			? 'authenticated'
-	// 			: 'unauthenticated'
-	// ); // 'loading', 'authenticated', 'unauthenticated'
-
-	$inspect('isAuthenticated', $isAuthenticated.data);
-	$inspect('isAuthenticatedResponse', isAuthenticatedResponse);
-	$inspect('isAuthenticatedResponse.data', isAuthenticatedResponse.data);
+	const isLoading = $derived(isAuthenticatedResponse.isLoading ? true : false);
+	const isAuthenticated = $derived(isAuthenticatedResponse.data ? true : false);
 
 	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
 	let user = $derived(currentUserResponse.data);
@@ -91,73 +74,70 @@
 	}
 </script>
 
-<div class="flex h-screen flex-col items-center justify-center">
-	{#if authState === 'loading'}
-		<div>Loading...</div>
-	{:else if authState === 'unauthenticated'}
-		<div>Hello {user?.name}!</div>
+<div class="flex h-screen flex-col items-center justify-center bg-gray-50">
+	{#if isLoading}
+		<div class="text-lg text-gray-600">Loading...</div>
+	{:else if !isAuthenticated}
 		<!-- Sign In Component -->
-		<form onsubmit={handleSubmit}>
-			{#if !showSignIn}
-				<input bind:value={name} placeholder="Name" required />
-			{/if}
-			<input type="email" bind:value={email} placeholder="Email" required />
-			<input type="password" bind:value={password} placeholder="Password" required />
-			<button type="submit">
-				{showSignIn ? 'Sign in' : 'Sign up'}
-			</button>
-		</form>
+		<div class="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
+			<h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+				{showSignIn ? 'Sign In' : 'Sign Up'}
+			</h2>
+			
+			<form onsubmit={handleSubmit} class="flex flex-col gap-4">
+				{#if !showSignIn}
+					<input 
+						bind:value={name} 
+						placeholder="Name" 
+						required 
+						class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					/>
+				{/if}
+				<input 
+					type="email" 
+					bind:value={email} 
+					placeholder="Email" 
+					required 
+					class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				/>
+				<input 
+					type="password" 
+					bind:value={password} 
+					placeholder="Password" 
+					required 
+					class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				/>
+				<button 
+					type="submit"
+					class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer"
+				>
+					{showSignIn ? 'Sign in' : 'Sign up'}
+				</button>
+			</form>
 
-		<p>
-			{showSignIn ? "Don't have an account? " : 'Already have an account? '}
-			<button type="button" onclick={toggleSignMode}>
-				{showSignIn ? 'Sign up' : 'Sign in'}
-			</button>
-		</p>
-	{:else if authState === 'authenticated'}
+			<p class="mt-4 text-center text-gray-600">
+				{showSignIn ? "Don't have an account? " : 'Already have an account? '}
+				<button 
+					type="button" 
+					onclick={toggleSignMode}
+					class="text-blue-600 hover:text-blue-800 underline bg-transparent border-none cursor-pointer"
+				>
+					{showSignIn ? 'Sign up' : 'Sign in'}
+				</button>
+			</p>
+		</div>
+	{:else if isAuthenticated}
 		<!-- Dashboard Component -->
-		<div>
-			<div>Hello {user?.name}!</div>
-			<button onclick={signOut}>Sign out</button>
+		<div class="w-full max-w-md p-6 bg-white rounded-lg shadow-md text-center">
+			<div class="text-xl font-semibold text-gray-800 mb-4">
+				Hello {user?.name}!
+			</div>
+			<button 
+				onclick={signOut}
+				class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer"
+			>
+				Sign out
+			</button>
 		</div>
 	{/if}
 </div>
-
-<style>
-	form {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		max-width: 300px;
-	}
-
-	input {
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-	}
-
-	button {
-		padding: 0.5rem 1rem;
-		background-color: #007bff;
-		color: white;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-
-	button:hover {
-		background-color: #0056b3;
-	}
-
-	button[type='button'] {
-		background-color: transparent;
-		color: #007bff;
-		text-decoration: underline;
-	}
-
-	button[type='button']:hover {
-		background-color: transparent;
-		color: #0056b3;
-	}
-</style>

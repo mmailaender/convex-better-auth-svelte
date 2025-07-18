@@ -1,8 +1,8 @@
 import { convexAdapter } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { betterAuth } from "better-auth";
-import { betterAuthComponent } from "../auth";
-import { type GenericCtx } from "../_generated/server";
+import { betterAuthComponent } from "../convex/auth";
+import { type GenericCtx } from "../convex/_generated/server";
 
 const siteUrl = process.env.CONVEX_SITE_URL;
 const trustedOrigins = process.env.TRUSTED_ORIGINS?.split(",") ?? [];

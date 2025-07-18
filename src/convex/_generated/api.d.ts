@@ -10,8 +10,6 @@
 
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
-import type * as model_auth from "../model/auth.js";
-import type * as model_authclient from "../model/authclient.js";
 
 import type {
   ApiFromModules,
@@ -30,8 +28,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
-  "model/auth": typeof model_auth;
-  "model/authclient": typeof model_authclient;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
