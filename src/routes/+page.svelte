@@ -2,13 +2,14 @@
 	import { authClient } from '$lib/auth-client';
 	import { api } from '../convex/_generated/api';
 	import { useConvexClient, useQuery } from 'convex-svelte';
+	import { useAuth } from '$lib/better-auth/client.svelte';
 
 	const convex = useConvexClient();
 
 	// Auth state store
-	const isAuthenticatedResponse = useQuery(api.auth.isAuthenticated, {});
-	const isLoading = $derived(isAuthenticatedResponse.isLoading ? true : false);
-	const isAuthenticated = $derived(isAuthenticatedResponse.data ? true : false);
+	const auth = useAuth();
+	const isLoading = $derived(auth.isLoading);
+	const isAuthenticated = $derived(auth.isAuthenticated);
 
 	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
 	let user = $derived(currentUserResponse.data);
