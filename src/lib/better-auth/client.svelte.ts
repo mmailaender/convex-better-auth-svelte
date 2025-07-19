@@ -115,7 +115,7 @@ const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => 
 	// Try to get client from context
 	try {
 		client = getContext('$$_convexClient');
-	} catch (e) {
+	} catch {
 		// Context not available or no client in context
 	}
 
@@ -123,14 +123,15 @@ const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => 
 	if (!client) {
 		try {
 			setupConvex(convexUrl, options);
-			// After setting up, try to get the client from context
+			// Try to get the client from context again after setup
 			try {
 				client = getContext('$$_convexClient');
-			} catch (e) {
-				// Context not available after setup
+			} catch {
+				// Context still not available - setupConvex may not have set context properly
+				console.warn('setupConvex completed but client not available in context');
 			}
 		} catch (e) {
-			console.warn('Failed to create Convex client:', e);
+			console.warn('Failed to setup Convex client:', e);
 		}
 	}
 
