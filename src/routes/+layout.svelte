@@ -1,11 +1,10 @@
 <script lang="ts">
 	import '../app.css';
-	import { PUBLIC_CONVEX_URL } from '$env/static/public';
-	
-	import { setupConvex } from 'convex-svelte';
+	import { createSvelteAuthClient } from '$lib/better-auth/client.svelte';
+	import { authClient } from '$lib/auth-client';
 
 
-	setupConvex(PUBLIC_CONVEX_URL);
+	createSvelteAuthClient({ authClient })
 
 	let { children } = $props();
 </script>

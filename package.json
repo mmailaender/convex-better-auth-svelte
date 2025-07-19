@@ -56,6 +56,7 @@
 		"@convex-dev/better-auth": "^0.7.7",
 		"better-auth": "1.2.12",
 		"convex": "^1.25.4",
-		"convex-svelte": "^0.0.11"
+		"convex-svelte": "^0.0.11",
+		"is-network-error": "^1.1.0"
 	}
 }

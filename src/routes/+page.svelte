@@ -32,12 +32,6 @@
 						onError: (ctx) => {
 							alert(ctx.error.message);
 						},
-						onSuccess: () => {
-							convex.setAuth(async () => {
-								const convexToken = await authClient.convex.token();
-								return convexToken.data?.token ?? '';
-							});
-						}
 					}
 				);
 			} else {
@@ -59,7 +53,6 @@
 	async function signOut() {
 		try {
 			await authClient.signOut();
-			convex.client.clearAuth();
 		} catch (error) {
 			console.error('Sign out error:', error);
 		}
