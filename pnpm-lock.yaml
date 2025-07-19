@@ -20,6 +20,9 @@ importers:
       convex-svelte:
         specifier: ^0.0.11
         version: 0.0.11(convex@1.25.4(react@19.1.0))(svelte@5.36.2)
+      is-network-error:
+        specifier: ^1.1.0
+        version: 1.1.0
     devDependencies:
       '@eslint/compat':
         specifier: ^1.2.5
