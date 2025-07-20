@@ -66,6 +66,23 @@
 		email = '';
 		password = '';
 	}
+
+	// Demo: Fetch access token
+	let accessToken = $state<string | null>(null);
+	let tokenLoading = $state(false);
+
+	async function fetchToken() {
+		tokenLoading = true;
+		try {
+			const token = await auth.fetchAccessToken({ forceRefreshToken: true });
+			accessToken = token;
+		} catch (error) {
+			console.error('Error fetching access token:', error);
+			accessToken = 'Error fetching token';
+		} finally {
+			tokenLoading = false;
+		}
+	}
 </script>
 
 <div class="flex h-screen flex-col items-center justify-center bg-gray-50">
@@ -126,6 +143,24 @@
 			<div class="text-xl font-semibold text-gray-800 mb-4">
 				Hello {user?.name}!
 			</div>
+			
+			<!-- Demo: Access Token Section -->
+			<div class="mb-4 p-4 bg-gray-50 rounded-md">
+				<h3 class="text-sm font-medium text-gray-700 mb-2">Access Token Demo</h3>
+				<button 
+					onclick={fetchToken}
+					disabled={tokenLoading}
+					class="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					{tokenLoading ? 'Fetching...' : 'Fetch Access Token'}
+				</button>
+				{#if accessToken}
+					<div class="mt-2 p-2 bg-white border rounded text-xs text-gray-600 break-all">
+						{accessToken.length > 50 ? accessToken.substring(0, 50) + '...' : accessToken}
+					</div>
+				{/if}
+			</div>
+			
 			<button 
 				onclick={signOut}
 				class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer"
