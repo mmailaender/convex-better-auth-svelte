@@ -1,5 +1,7 @@
 1. run `pnpm i && pnpm dev`
-2. Set environment variables
+2. Add PUBLIC_CONVEX_SITE_URL to .env.local
+e.g. `https://quick-dog-123.convex.site`
+3. Set environment variables
 
 Generate a secret for encryption and generating hashes.
 `npx convex env set BETTER_AUTH_SECRET=$(openssl rand -base64 32)`
