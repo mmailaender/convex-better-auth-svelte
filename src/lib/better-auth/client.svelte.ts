@@ -1,4 +1,4 @@
-import { getContext, onMount } from 'svelte';
+import { getContext, setContext, onMount } from 'svelte';
 
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
@@ -17,7 +17,11 @@ export type ConvexAuthClient = {
 };
 type CrossDomainClient = ReturnType<typeof crossDomainClient>;
 type ConvexClientBetterAuth = ReturnType<typeof convexClient>;
-type PluginsWithCrossDomain = (CrossDomainClient | ConvexClientBetterAuth | BetterAuthClientPlugin)[];
+type PluginsWithCrossDomain = (
+	| CrossDomainClient
+	| ConvexClientBetterAuth
+	| BetterAuthClientPlugin
+)[];
 type PluginsWithoutCrossDomain = (ConvexClientBetterAuth | BetterAuthClientPlugin)[];
 type AuthClientWithPlugins<Plugins extends PluginsWithCrossDomain | PluginsWithoutCrossDomain> =
 	ReturnType<
@@ -38,6 +42,14 @@ type ExtractSessionState<T> = T extends {
 	: never;
 type SessionState = ExtractSessionState<ReturnType<AuthClient['useSession']>>;
 
+// Context key for sharing auth client and functions
+const AUTH_CONTEXT_KEY = Symbol('auth-context');
+
+type AuthContext = {
+	authClient: AuthClient;
+	fetchAccessToken: (options: { forceRefreshToken: boolean }) => Promise<string | null>;
+};
+
 /**
  * Create a Convex Better Auth client for Svelte
  */
@@ -52,7 +64,7 @@ export function createSvelteAuthClient({
 	convexClient?: ConvexClient;
 	options?: ConvexClientOptions;
 }) {
-    let sessionData: SessionState['data'] | null = $state(null);
+	let sessionData: SessionState['data'] | null = $state(null);
 	authClient.useSession().subscribe((session) => {
 		console.log(session);
 		sessionData = session.data;
@@ -103,6 +115,12 @@ export function createSvelteAuthClient({
 		} else {
 			convexClient.client.clearAuth();
 		}
+	});
+
+	// Set context to make authClient and fetchAccessToken available to useAuth
+	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
+		authClient,
+		fetchAccessToken
 	});
 }
 
@@ -209,16 +227,27 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 	}
 };
 
-// TODO: Add fetchAccessToken support
+/**
+ * Hook to access authentication state and functions
+ * Must be used within a component that has createSvelteAuthClient called in its parent tree
+ */
 export const useAuth = (): {
 	isLoading: boolean;
 	isAuthenticated: boolean;
-	// fetchAccessToken: ({
-	//     forceRefreshToken
-	// }: {
-	//     forceRefreshToken: boolean;
-	// }) => Promise<string | null>;
+	fetchAccessToken: ({
+		forceRefreshToken
+	}: {
+		forceRefreshToken: boolean;
+	}) => Promise<string | null>;
 } => {
+	const authContext = getContext<AuthContext>(AUTH_CONTEXT_KEY);
+
+	if (!authContext) {
+		throw new Error(
+			'useAuth must be used within a component that has createSvelteAuthClient called in its parent tree'
+		);
+	}
+
 	const isAuthenticatedResponse = useQuery(api.auth.isAuthenticated, {});
 	const isLoading = $derived(isAuthenticatedResponse.isLoading ? true : false);
 	const isAuthenticated = $derived(isAuthenticatedResponse.data ? true : false);
@@ -229,9 +258,7 @@ export const useAuth = (): {
 		},
 		get isAuthenticated() {
 			return isAuthenticated;
-		}
-		// fetchAccessToken: ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-		//     return authClient.fetchAccessToken({ forceRefreshToken });
-		// }
+		},
+		fetchAccessToken: authContext.fetchAccessToken
 	};
 };
