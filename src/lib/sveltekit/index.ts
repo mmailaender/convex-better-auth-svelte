@@ -1,5 +1,5 @@
 
-import { betterAuth } from "better-auth";
+import type { betterAuth } from "better-auth";
 import { createCookieGetter } from "better-auth/cookies";
 import type { GenericActionCtx } from "convex/server";
 import type { RequestHandler } from "@sveltejs/kit";

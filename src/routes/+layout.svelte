@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
-	import { createSvelteAuthClient } from '$lib/better-auth/client.svelte';
-	import { authClient } from '$lib/auth-client';
+	import { createSvelteAuthClient } from '$lib/svelte/index.js';
+	import { authClient } from '$lib/auth-client.js';
 
 
 	createSvelteAuthClient({ authClient })
