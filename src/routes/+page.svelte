@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client';
-	import { api } from '../convex/_generated/api';
+	import { authClient } from '$lib/auth-client.js';
+	import { api } from '$convex/_generated/api.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
-	import { useAuth } from '$lib/better-auth/client.svelte';
+	import { useAuth } from '$lib/svelte/index.js';
 
 	const convex = useConvexClient();
 

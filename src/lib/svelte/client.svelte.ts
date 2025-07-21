@@ -3,7 +3,7 @@ import { getContext, setContext, onMount } from 'svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
 import { setupConvex, useQuery } from 'convex-svelte';
-import { api } from '$convex/_generated/api';
+import { api } from '$convex/_generated/api.js';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
