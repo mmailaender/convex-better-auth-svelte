@@ -59,13 +59,13 @@ Generate a secret for encryption and generating hashes. Use the command below if
 npx convex env set BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 ```
 
-Add TRUSTED_ORIGINS to convex as env variable and set the value to "http://localhost:5173" for your dev environment (If you're using vite).
+Add SITE_URL to convex as env variable and set the value to "http://localhost:5173" for your dev environment (If you're using vite).
 
 ```bash
-npx convex env set TRUSTED_ORIGINS="http://localhost:5173"
+npx convex env set SITE_URL="http://localhost:5173"
 ```
 
-Add the Convex site URL environment variable to the .env.local file created by npx convex dev. It will be picked up by your framework dev server.
+Add the Convex site URL environment variable to the .env.local file created by npx convex dev. It will be picked up by your SvelteKit dev server.
 
 ```bash
 npx convex env set PUBLIC_CONVEX_SITE_URL="https://quick-dog-123.convex.site"
