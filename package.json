@@ -1,5 +1,5 @@
 {
-	"name": "convex-better-auth-svelte",
+	"name": "@mmailaender/convex-better-auth-svelte",
 	"version": "0.0.1",
 	"scripts": {
 		"dev:frontend": "vite dev",
@@ -17,20 +17,23 @@
 		"test": "npm run test:unit -- --run"
 	},
 	"files": [
-		"dist",
+		"dist/svelte",
+		"dist/sveltekit",
 		"!dist/**/*.test.*",
 		"!dist/**/*.spec.*"
 	],
 	"sideEffects": [
 		"**/*.css"
 	],
-	"svelte": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"type": "module",
 	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"svelte": "./dist/index.js"
+		"./svelte": {
+			"types": "./dist/svelte/index.d.ts",
+			"svelte": "./dist/svelte/index.js"
+		},
+		"./sveltekit": {
+			"types": "./dist/sveltekit/index.d.ts",
+			"sveltekit": "./dist/sveltekit/index.js"
 		}
 	},
 	"peerDependencies": {
