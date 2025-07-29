@@ -7,6 +7,9 @@
 		"type": "git",
 		"url": "git+https://github.com/mmailaender/convex-better-auth-svelte.git"
 	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"dev:frontend": "vite dev",
 		"dev:backend": "npx convex dev",
