@@ -20,8 +20,14 @@
 	let email = $state('');
 	let password = $state('');
 
+	async function handleSocialSubmit(provider: string) {
+		const data = await authClient.signIn.social({
+			provider
+		});
+	}
+
 	// Handle form submission
-	async function handleSubmit(event: Event) {
+	async function handlePasswordSubmit(event: Event) {
 		event.preventDefault();
 
 		try {
@@ -31,7 +37,7 @@
 					{
 						onError: (ctx) => {
 							alert(ctx.error.message);
-						},
+						}
 					}
 				);
 			} else {
@@ -90,37 +96,41 @@
 		<div class="text-lg text-gray-600">Loading...</div>
 	{:else if !isAuthenticated}
 		<!-- Sign In Component -->
-		<div class="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
-			<h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-md flex flex-col gap-4">
+			<h2 class="mb-6 text-center text-2xl font-bold text-gray-800">
 				{showSignIn ? 'Sign In' : 'Sign Up'}
 			</h2>
-			
-			<form onsubmit={handleSubmit} class="flex flex-col gap-4">
+
+			<button class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none" onclick={() => handleSocialSubmit('github')}>
+				GitHub
+			</button>
+
+			<form onsubmit={handlePasswordSubmit} class="flex flex-col gap-4">
 				{#if !showSignIn}
-					<input 
-						bind:value={name} 
-						placeholder="Name" 
-						required 
-						class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					<input
+						bind:value={name}
+						placeholder="Name"
+						required
+						class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
 					/>
 				{/if}
-				<input 
-					type="email" 
-					bind:value={email} 
-					placeholder="Email" 
-					required 
-					class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				<input
+					type="email"
+					bind:value={email}
+					placeholder="Email"
+					required
+					class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
 				/>
-				<input 
-					type="password" 
-					bind:value={password} 
-					placeholder="Password" 
-					required 
-					class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				<input
+					type="password"
+					bind:value={password}
+					placeholder="Password"
+					required
+					class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
 				/>
-				<button 
+				<button
 					type="submit"
-					class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer"
+					class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
 				>
 					{showSignIn ? 'Sign in' : 'Sign up'}
 				</button>
@@ -128,10 +138,10 @@
 
 			<p class="mt-4 text-center text-gray-600">
 				{showSignIn ? "Don't have an account? " : 'Already have an account? '}
-				<button 
-					type="button" 
+				<button
+					type="button"
 					onclick={toggleSignMode}
-					class="text-blue-600 hover:text-blue-800 underline bg-transparent border-none cursor-pointer"
+					class="cursor-pointer border-none bg-transparent text-blue-600 underline hover:text-blue-800"
 				>
 					{showSignIn ? 'Sign up' : 'Sign in'}
 				</button>
@@ -139,31 +149,31 @@
 		</div>
 	{:else if isAuthenticated}
 		<!-- Dashboard Component -->
-		<div class="w-full max-w-md p-6 bg-white rounded-lg shadow-md text-center">
-			<div class="text-xl font-semibold text-gray-800 mb-4">
+		<div class="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-md">
+			<div class="mb-4 text-xl font-semibold text-gray-800">
 				Hello {user?.name}!
 			</div>
-			
+
 			<!-- Demo: Access Token Section -->
-			<div class="mb-4 p-4 bg-gray-50 rounded-md">
-				<h3 class="text-sm font-medium text-gray-700 mb-2">Access Token Demo</h3>
-				<button 
+			<div class="mb-4 rounded-md bg-gray-50 p-4">
+				<h3 class="mb-2 text-sm font-medium text-gray-700">Access Token Demo</h3>
+				<button
 					onclick={fetchToken}
 					disabled={tokenLoading}
-					class="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+					class="cursor-pointer rounded-md bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{tokenLoading ? 'Fetching...' : 'Fetch Access Token'}
 				</button>
 				{#if accessToken}
-					<div class="mt-2 p-2 bg-white border rounded text-xs text-gray-600 break-all">
+					<div class="mt-2 rounded border bg-white p-2 text-xs break-all text-gray-600">
 						{accessToken.length > 50 ? accessToken.substring(0, 50) + '...' : accessToken}
 					</div>
 				{/if}
 			</div>
-			
-			<button 
+
+			<button
 				onclick={signOut}
-				class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer"
+				class="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
 			>
 				Sign out
 			</button>
