@@ -16,7 +16,7 @@ To get started, install the component, a pinned version of Better Auth, and the 
 ```bash
 pnpm add @convex-dev/better-auth
 pnpm add @mmailaender/convex-better-auth-svelte@latest
-pnpm add better-auth@1.2.12 --save-exact
+pnpm add better-auth@1.3.4 --save-exact
 pnpm add convex@latest
 ```
 
