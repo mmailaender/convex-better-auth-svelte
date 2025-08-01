@@ -237,12 +237,13 @@ createSvelteAuthClient({ authClient });
 let { children } = $props();
 ```
 
-## Basic Usage
+## Usage
 Follow the [Better Auth documentation](https://www.better-auth.com/docs/basic-usage) for basic usage. The Convex component provides a compatibility layer so things generally work as expected.
 
 Some things that do work differently with this component are documented here.
 
-### Signing in
+### Client
+#### Signing in
 Below is a basic example of a working auth flow with email (unverified) and password.
 
 `src/routes/+page.svelte`
@@ -419,3 +420,21 @@ Below is a basic example of a working auth flow with email (unverified) and pass
 	{/if}
 </div>
 ```
+### Server
+
+#### Query - Convex
+```ts
+import type { PageServerLoad } from './$types.ts';
+import { api } from '$convex/_generated/api.js';
+import { createConvexHttpClient } from '@mmailaender/convex-better-auth-svelte/sveltekit';
+
+export const load: PageServerLoad = async ({ cookies }) => {
+	const client = createConvexHttpClient({ cookies });
+
+	const currentUser = await client.query(api.auth.getCurrentUser, {});
+
+	return { currentUser };
+};
+
+```
+

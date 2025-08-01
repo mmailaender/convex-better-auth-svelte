@@ -66,7 +66,6 @@ export function createSvelteAuthClient({
 }) {
 	let sessionData: SessionState['data'] | null = $state(null);
 	authClient.useSession().subscribe((session) => {
-		console.log(session);
 		sessionData = session.data;
 	});
 	const isAuthenticated = $derived(sessionData !== null);

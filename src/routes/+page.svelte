@@ -4,15 +4,15 @@
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '$lib/svelte/index.js';
 
-	const convex = useConvexClient();
+	let { data } = $props();
 
 	// Auth state store
 	const auth = useAuth();
-	const isLoading = $derived(auth.isLoading);
-	const isAuthenticated = $derived(auth.isAuthenticated);
+	const isLoading = $derived(auth.isLoading && !data.currentUser);
+	const isAuthenticated = $derived(auth.isAuthenticated || !!data.currentUser);
 
 	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
-	let user = $derived(currentUserResponse.data);
+	let user = $derived(currentUserResponse.data ?? data.currentUser);
 
 	// Sign in/up form state
 	let showSignIn = $state(true);
@@ -21,7 +21,7 @@
 	let password = $state('');
 
 	async function handleSocialSubmit(provider: string) {
-		const data = await authClient.signIn.social({
+		await authClient.signIn.social({
 			provider
 		});
 	}
@@ -96,12 +96,15 @@
 		<div class="text-lg text-gray-600">Loading...</div>
 	{:else if !isAuthenticated}
 		<!-- Sign In Component -->
-		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-md flex flex-col gap-4">
+		<div class="flex w-full max-w-md flex-col gap-4 rounded-lg bg-white p-6 shadow-md">
 			<h2 class="mb-6 text-center text-2xl font-bold text-gray-800">
 				{showSignIn ? 'Sign In' : 'Sign Up'}
 			</h2>
 
-			<button class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none" onclick={() => handleSocialSubmit('github')}>
+			<button
+				class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+				onclick={() => handleSocialSubmit('github')}
+			>
 				GitHub
 			</button>
 
