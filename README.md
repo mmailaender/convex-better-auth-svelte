@@ -229,7 +229,7 @@ export const { GET, POST } = createSvelteKitHandler();
 `src/routes/+layout.svelte`
 ```ts
 import '../app.css';
-import { createSvelteAuthClient } from '$lib/svelte/index.js';
+import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 import { authClient } from '$lib/auth-client.js';
 
 createSvelteAuthClient({ authClient });
@@ -253,7 +253,7 @@ Below is a basic example of a working auth flow with email (unverified) and pass
 	import { authClient } from '$lib/auth-client.js';
 	import { api } from '$convex/_generated/api.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
-	import { useAuth } from '$lib/svelte/index.js';
+	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
 
 	const convex = useConvexClient();
 
