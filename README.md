@@ -217,9 +217,9 @@ export default http
 
 Set up route handlers to proxy auth requests from your sveltekit server to your Convex deployment.
 
-`api/aut/[...all]/+server.ts`
+`api/auth/[...all]/+server.ts`
 ```ts
-import { createSvelteKitHandler } from '$lib/sveltekit/index.js';
+import { createSvelteKitHandler } from '@mmailaender/convex-better-auth-svelte/sveltekit';
 
 export const { GET, POST } = createSvelteKitHandler();
 ```
@@ -230,7 +230,7 @@ export const { GET, POST } = createSvelteKitHandler();
 ```ts
 import '../app.css';
 import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
-import { authClient } from '$lib/auth-client.js';
+import { authClient } from '$lib/auth-client';
 
 createSvelteAuthClient({ authClient });
 
@@ -258,9 +258,8 @@ Below is a basic example of a working auth flow with email (unverified) and pass
 	const convex = useConvexClient();
 
 	// Auth state store
-	const auth = useAuth();
-	const isLoading = $derived(auth.isLoading);
-	const isAuthenticated = $derived(auth.isAuthenticated);
+	const isLoading = $derived(useAuth().isLoading);
+	const isAuthenticated = $derived(useAuth().isAuthenticated);
 
 	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
 	let user = $derived(currentUserResponse.data);
