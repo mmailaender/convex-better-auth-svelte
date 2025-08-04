@@ -6,6 +6,34 @@ You'll first need a project on Convex where `npx convex dev` has been run on you
 
 > It's helpful to have the Convex dev server (`npx convex dev`) running in the background while setting up, otherwise you'll see type errors that won't resolve until you run it.
 
+### Add $convex alias
+
+Add the following to your `svelte.config.js` file:
+
+```js
+import adapter from '@sveltejs/adapter-auto';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	// Consult https://svelte.dev/docs/kit/integrations
+	// for more information about preprocessors
+	preprocess: vitePreprocess(),
+
+	kit: {
+		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
+		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
+		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
+		adapter: adapter(),
+		alias: {
+			$convex: './src/convex'
+		}
+	}
+};
+
+export default config;
+```
+
 ## Installation
 
 Install the component
@@ -231,8 +259,9 @@ export const { GET, POST } = createSvelteKitHandler();
 import '../app.css';
 import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 import { authClient } from '$lib/auth-client';
+import { api } from '$convex/_generated/api.js';
 
-createSvelteAuthClient({ authClient });
+createSvelteAuthClient({ authClient, api });
 
 let { children } = $props();
 ```
@@ -258,8 +287,9 @@ Below is a basic example of a working auth flow with email (unverified) and pass
 	const convex = useConvexClient();
 
 	// Auth state store
-	const isLoading = $derived(useAuth().isLoading);
-	const isAuthenticated = $derived(useAuth().isAuthenticated);
+	const auth = useAuth();
+	const isLoading = $derived(auth.isLoading);
+	const isAuthenticated = $derived(auth.isAuthenticated);
 
 	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
 	let user = $derived(currentUserResponse.data);

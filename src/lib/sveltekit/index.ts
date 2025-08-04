@@ -1,7 +1,7 @@
 import type { betterAuth } from 'better-auth';
 import { createCookieGetter } from 'better-auth/cookies';
 import type { GenericActionCtx } from 'convex/server';
-import type { Cookies, RequestEvent, RequestHandler } from '@sveltejs/kit';
+import type { Cookies, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
 import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
