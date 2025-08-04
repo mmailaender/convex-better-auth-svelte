@@ -3,18 +3,27 @@ import { getContext, setContext, onMount } from 'svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
 import { setupConvex, useQuery } from 'convex-svelte';
-import { api } from '$convex/_generated/api.js';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
 import type { BetterAuthClientPlugin, ClientOptions } from 'better-auth';
 import type { createAuthClient } from 'better-auth/svelte';
 import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
+import type { FunctionReference } from 'convex/server';
 
 export type ConvexAuthClient = {
 	verbose?: boolean;
 	logger?: Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>;
 };
+
+export type ConvexAuthAPI = {
+	auth: {
+		isAuthenticated: FunctionReference<"query", "public", {}, boolean, string | undefined>; // This will be the user's generated query function
+	};
+	// Allow other API endpoints
+	[key: string]: any;
+};
+
 type CrossDomainClient = ReturnType<typeof crossDomainClient>;
 type ConvexClientBetterAuth = ReturnType<typeof convexClient>;
 type PluginsWithCrossDomain = (
@@ -48,6 +57,7 @@ const AUTH_CONTEXT_KEY = Symbol('auth-context');
 type AuthContext = {
 	authClient: AuthClient;
 	fetchAccessToken: (options: { forceRefreshToken: boolean }) => Promise<string | null>;
+	api: ConvexAuthAPI; // User's generated API
 };
 
 /**
@@ -57,12 +67,14 @@ export function createSvelteAuthClient({
 	authClient,
 	convexUrl,
 	convexClient,
-	options
+	options,
+	api
 }: {
 	authClient: AuthClient;
 	convexUrl?: string;
 	convexClient?: ConvexClient;
 	options?: ConvexClientOptions;
+	api: ConvexAuthAPI; // User's generated API from their convex/_generated/api.js
 }) {
 	let sessionData: SessionState['data'] | null = $state(null);
 	authClient.useSession().subscribe((session) => {
@@ -119,7 +131,8 @@ export function createSvelteAuthClient({
 	// Set context to make authClient and fetchAccessToken available to useAuth
 	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
 		authClient,
-		fetchAccessToken
+		fetchAccessToken,
+		api
 	});
 }
 
@@ -247,7 +260,7 @@ export const useAuth = (): {
 		);
 	}
 
-	const isAuthenticatedResponse = useQuery(api.auth.isAuthenticated, {});
+	const isAuthenticatedResponse = useQuery(authContext.api.auth.isAuthenticated, {});
 	const isLoading = $derived(isAuthenticatedResponse.isLoading ? true : false);
 	const isAuthenticated = $derived(isAuthenticatedResponse.data ? true : false);
 
