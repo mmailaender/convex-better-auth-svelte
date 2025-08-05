@@ -2,26 +2,17 @@ import { getContext, setContext, onMount } from 'svelte';
 
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
-import { setupConvex, useQuery } from 'convex-svelte';
+import { setupConvex } from 'convex-svelte';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
 import type { BetterAuthClientPlugin, ClientOptions } from 'better-auth';
 import type { createAuthClient } from 'better-auth/svelte';
 import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
-import type { FunctionReference } from 'convex/server';
 
 export type ConvexAuthClient = {
 	verbose?: boolean;
 	logger?: Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>;
-};
-
-export type ConvexAuthAPI = {
-	auth: {
-		isAuthenticated: FunctionReference<"query", "public", {}, boolean, string | undefined>; // This will be the user's generated query function
-	};
-	// Allow other API endpoints
-	[key: string]: any;
 };
 
 type CrossDomainClient = ReturnType<typeof crossDomainClient>;
@@ -57,7 +48,8 @@ const AUTH_CONTEXT_KEY = Symbol('auth-context');
 type AuthContext = {
 	authClient: AuthClient;
 	fetchAccessToken: (options: { forceRefreshToken: boolean }) => Promise<string | null>;
-	api: ConvexAuthAPI; // User's generated API
+	isLoading: boolean;
+	isAuthenticated: boolean;
 };
 
 /**
@@ -68,19 +60,43 @@ export function createSvelteAuthClient({
 	convexUrl,
 	convexClient,
 	options,
-	api
 }: {
 	authClient: AuthClient;
 	convexUrl?: string;
 	convexClient?: ConvexClient;
 	options?: ConvexClientOptions;
-	api: ConvexAuthAPI; // User's generated API from their convex/_generated/api.js
 }) {
 	let sessionData: SessionState['data'] | null = $state(null);
+	let sessionPending: boolean = $state(true);
+	
+	let isConvexAuthenticated: boolean | null = $state(null);
+	
 	authClient.useSession().subscribe((session) => {
+		const wasAuthenticated = sessionData !== null;
 		sessionData = session.data;
+		sessionPending = session.isPending;
+		
+		// If session state changed from authenticated to unauthenticated, reset Convex auth
+		const isNowAuthenticated = sessionData !== null;
+		if (wasAuthenticated && !isNowAuthenticated) {
+			isConvexAuthenticated = false;
+		}
+		// If we went back to loading state, reset Convex auth to null
+		if (session.isPending && isConvexAuthenticated !== null) {
+			isConvexAuthenticated = null;
+		}
 	});
-	const isAuthenticated = $derived(sessionData !== null);
+	
+	const isAuthProviderAuthenticated = $derived(sessionData !== null);
+	
+	const isAuthenticated = $derived(
+		isAuthProviderAuthenticated && (isConvexAuthenticated ?? false)
+	);
+	
+	// Loading state - we're loading if session is pending OR if we have a session but no Convex confirmation yet
+	const isLoading = $derived(
+		sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
+	);
 
 	const fetchAccessToken = async ({
 		forceRefreshToken
@@ -120,19 +136,43 @@ export function createSvelteAuthClient({
 		handleOneTimeToken(authClient);
 	});
 
+	// Updated effect to handle backend confirmation
 	$effect(() => {
-		if (isAuthenticated) {
-			convexClient.setAuth(fetchAccessToken);
+		let effectRelevant = true;
+		
+		if (isAuthProviderAuthenticated) {
+			// Set auth with callback to receive backend confirmation
+			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
+				if (effectRelevant) {
+					isConvexAuthenticated = backendReportsIsAuthenticated;
+				}
+			});
+			
+			// Cleanup function
+			return () => {
+				effectRelevant = false;
+				// If unmounting or something changed before we finished fetching the token
+				// we shouldn't transition to a loaded state.
+				isConvexAuthenticated = isConvexAuthenticated ? false : null;
+			};
 		} else {
+			// Clear auth when not authenticated
 			convexClient.client.clearAuth();
+			// Also run cleanup for clearing
+			return () => {
+				// Set state back to loading in case this is a transition from one
+				// fetchToken function to another
+				isConvexAuthenticated = null;
+			};
 		}
 	});
 
-	// Set context to make authClient and fetchAccessToken available to useAuth
+	// Set context to make auth state available to useAuth
 	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
 		authClient,
 		fetchAccessToken,
-		api
+		get isLoading() { return isLoading; },
+		get isAuthenticated() { return isAuthenticated; }
 	});
 }
 
@@ -260,16 +300,12 @@ export const useAuth = (): {
 		);
 	}
 
-	const isAuthenticatedResponse = useQuery(authContext.api.auth.isAuthenticated, {});
-	const isLoading = $derived(isAuthenticatedResponse.isLoading ? true : false);
-	const isAuthenticated = $derived(isAuthenticatedResponse.data ? true : false);
-
-	return {
+  return {
 		get isLoading() {
-			return isLoading;
+			return authContext.isLoading;
 		},
 		get isAuthenticated() {
-			return isAuthenticated;
+			return authContext.isAuthenticated;
 		},
 		fetchAccessToken: authContext.fetchAccessToken
 	};

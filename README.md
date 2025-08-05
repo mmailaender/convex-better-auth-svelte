@@ -259,9 +259,8 @@ export const { GET, POST } = createSvelteKitHandler();
 import '../app.css';
 import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 import { authClient } from '$lib/auth-client';
-import { api } from '$convex/_generated/api.js';
 
-createSvelteAuthClient({ authClient, api });
+createSvelteAuthClient({ authClient });
 
 let { children } = $props();
 ```

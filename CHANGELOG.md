@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.4
+
+- Feature: Validate isAuthenticated via setAuth callback instead via api similar like react. Removes the need to pass the api to createSvelteAuthClient().
+```ts
+import { createSvelteAuthClient } from '$lib/svelte/index.js';
+import { authClient } from '$lib/auth-client.js';
+
+createSvelteAuthClient({ authClient })
+```
+
 ## 0.0.3
 
 - Fix: Pass convex api to createSvelteAuthClient() to resolve type errors
