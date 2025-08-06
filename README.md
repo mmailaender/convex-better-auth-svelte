@@ -448,9 +448,9 @@ Below is a basic example of a working auth flow with email (unverified) and pass
 	{/if}
 </div>
 ```
-### Server
+### Server (Sveltekit)
 
-#### Query - Convex
+#### Query
 ```ts
 import type { PageServerLoad } from './$types.ts';
 import { api } from '$convex/_generated/api.js';
@@ -466,3 +466,34 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 ```
 
+### Server (Convex)
+
+There are two options for interacting with Better Auth from Convex. The first option is to use the Better Auth API. The second option is to use the Better Auth components API. In most of the cases the Better Auth API is the better option. Use the components API only if you have a use case that is not covered by the Better Auth API.
+
+#### Query 
+
+##### Better Auth API
+
+```ts
+import { createAuth } from '../src/components/auth';
+import { betterAuthComponent } from './auth';
+```
+```ts
+const auth = createAuth(ctx);
+
+await auth.api.getSession({
+		headers: await betterAuthComponent.getHeaders(ctx)
+})
+```
+
+##### Better Auth components
+
+```ts
+import { components } from './_generated/api.js';
+```
+```ts
+await ctx.runQuery(components.betterAuth.lib.findOne, {
+	model: 'user',
+	where: [{ field: 'email', operator: 'eq', value: email }]
+});
+```
