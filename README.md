@@ -479,6 +479,9 @@ import { createAuth } from '../src/components/auth';
 import { betterAuthComponent } from './auth';
 ```
 ```ts
+const userId = await betterAuthComponent.getAuthUserId(ctx);
+const user = await betterAuthComponent.getAuthUser(ctx);
+
 const auth = createAuth(ctx);
 
 await auth.api.getSession({
