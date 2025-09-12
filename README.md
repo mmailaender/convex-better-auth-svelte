@@ -81,7 +81,7 @@ export default {
 
 ### Set environment variables
 
-Generate a secret for encryption and generating hashes. Use the command below if you have openssl installed, or use the button to generate a random value instead. Or generate your own however you like.
+Generate a secret for encryption and generating hashes. Use the command below if you have openssl installed, or generate your own however you like.
 
 ```bash
 npx convex env set BETTER_AUTH_SECRET=$(openssl rand -base64 32)
