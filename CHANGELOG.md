@@ -1,26 +1,33 @@
 # Changelog
 
+## 0.0.5
+
+### Patch Changes
+
+- d10b08c: Update better-auth and convex dependencies to peer deps
+
 ## 0.0.4
 
 - Feature: Validate isAuthenticated via setAuth callback instead via api similar like react. Removes the need to pass the api to createSvelteAuthClient().
+
 ```ts
 import { createSvelteAuthClient } from '$lib/svelte/index.js';
 import { authClient } from '$lib/auth-client.js';
 
-createSvelteAuthClient({ authClient })
+createSvelteAuthClient({ authClient });
 ```
 
 ## 0.0.3
 
 - Fix: Pass convex api to createSvelteAuthClient() to resolve type errors
+
 ```ts
 import { createSvelteAuthClient } from '$lib/svelte/index.js';
 import { authClient } from '$lib/auth-client.js';
 import { api } from '$convex/_generated/api.js';
 
-createSvelteAuthClient({ authClient, api })
+createSvelteAuthClient({ authClient, api });
 ```
-
 
 ## 0.0.2
 
