@@ -21,7 +21,7 @@ export const createAuth = (
 		logger: {
 			disabled: optionsOnly
 		},
-		baseUrl: siteUrl,
+		baseURL: siteUrl,
 		database: authComponent.adapter(ctx),
 		// Configure simple, non-verified email/password to get started
 		emailAndPassword: {

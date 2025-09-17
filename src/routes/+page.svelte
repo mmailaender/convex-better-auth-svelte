@@ -20,12 +20,6 @@
 	let email = $state('');
 	let password = $state('');
 
-	async function handleSocialSubmit(provider: string) {
-		await authClient.signIn.social({
-			provider
-		});
-	}
-
 	// Handle form submission
 	async function handlePasswordSubmit(event: Event) {
 		event.preventDefault();
@@ -100,13 +94,6 @@
 			<h2 class="mb-6 text-center text-2xl font-bold text-gray-800">
 				{showSignIn ? 'Sign In' : 'Sign Up'}
 			</h2>
-
-			<button
-				class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
-				onclick={() => handleSocialSubmit('github')}
-			>
-				GitHub
-			</button>
 
 			<form onsubmit={handlePasswordSubmit} class="flex flex-col gap-4">
 				{#if !showSignIn}
