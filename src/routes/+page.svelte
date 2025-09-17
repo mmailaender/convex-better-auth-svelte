@@ -57,10 +57,10 @@
 
 	// Sign out function
 	async function signOut() {
-		try {
-			await authClient.signOut();
-		} catch (error) {
-			console.error('Sign out error:', error);
+		
+		const result = await authClient.signOut();
+		if(result.error) {
+			console.error('Sign out error:', result.error);
 		}
 	}
 

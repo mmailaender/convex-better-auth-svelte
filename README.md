@@ -34,7 +34,7 @@ const config = {
 export default config;
 ```
 
-## Installation
+## 1. Installation
 
 Install the component
 To get started, install the component, a pinned version of Better Auth, and the latest version of Convex
@@ -42,13 +42,13 @@ To get started, install the component, a pinned version of Better Auth, and the 
 > This component requires Convex `1.25.0` or later.
 
 ```bash
-pnpm add @convex-dev/better-auth
-pnpm add @mmailaender/convex-better-auth-svelte@latest
-pnpm add better-auth@1.3.4 --save-exact
-pnpm add convex@latest
+pnpm add better-auth@1.3.8 --save-exact
+pnpm add convex@latest @convex-dev/better-auth @mmailaender/convex-better-auth-svelte
 ```
 
-Add the component to your application.
+## 2. Register the component
+
+Register the Better Auth component in your Convex project.
 
 `src/convex/convex.config.ts`
 
@@ -62,24 +62,22 @@ app.use(betterAuth);
 export default app;
 ```
 
+## 3. Add Convex auth config
+
 Add a `convex/auth.config.ts` file to configure Better Auth as an authentication provider:
 
 ```ts
 export default {
-	providers: [
-		{
-			// Your Convex site URL is provided in a system
-			// environment variable
-			domain: process.env.CONVEX_SITE_URL,
-
-			// Application ID has to be "convex"
-			applicationID: 'convex'
-		}
-	]
+  providers: [
+    {
+      domain: process.env.CONVEX_SITE_URL,
+      applicationID: "convex",
+    },
+  ],
 };
 ```
 
-### Set environment variables
+## 4. Set environment variables
 
 Generate a secret for encryption and generating hashes. Use the command below if you have openssl installed, or generate your own however you like.
 
@@ -127,7 +125,7 @@ Note: Some Typescript errors will show until you save the file.
 import { convexAdapter } from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
 import { betterAuth } from 'better-auth';
-import { betterAuthComponent } from '../convex/auth.js';
+import { authComponent } from '../convex/auth.js';
 import { type GenericCtx } from '../convex/_generated/server.js';
 
 const siteUrl = process.env.SITE_URL;
@@ -137,7 +135,7 @@ export const createAuth = (ctx: GenericCtx) =>
 	betterAuth({
 		// All auth requests will be proxied through your sveltekit server
 		baseURL: siteUrl,
-		database: convexAdapter(ctx, betterAuthComponent),
+		database: convexAdapter(ctx, authComponent),
 
 		// Simple non-verified email/password to get started
 		emailAndPassword: {
@@ -172,14 +170,14 @@ const authFunctions: AuthFunctions = internal.auth;
 const publicAuthFunctions: PublicAuthFunctions = api.auth;
 
 // Initialize the component
-export const betterAuthComponent = new BetterAuth(components.betterAuth, {
+export const authComponent = new BetterAuth(components.betterAuth, {
 	authFunctions,
 	publicAuthFunctions
 });
 
 // These are required named exports
 export const { createUser, updateUser, deleteUser, createSession, isAuthenticated } =
-	betterAuthComponent.createAuthFunctions<DataModel>({
+	authComponent.createAuthFunctions<DataModel>({
 		// Must create a user and return the user id
 		onCreateUser: async (ctx) => {
 			return ctx.db.insert('users', {});
@@ -197,7 +195,7 @@ export const getCurrentUser = query({
 	args: {},
 	handler: async (ctx) => {
 		// Get user data from Better Auth - email, name, image, etc.
-		const userMetadata = await betterAuthComponent.getAuthUser(ctx);
+		const userMetadata = await authComponent.getAuthUser(ctx);
 		if (!userMetadata) {
 			return null;
 		}
@@ -233,12 +231,12 @@ Register Better Auth route handlers on your Convex deployment.
 `src/convex/http.ts`
 ```ts
 import { httpRouter } from 'convex/server'
-import { betterAuthComponent } from './auth'
+import { authComponent } from './auth'
 import { createAuth } from '../lib/auth'
 
 const http = httpRouter()
 
-betterAuthComponent.registerRoutes(http, createAuth)
+authComponent.registerRoutes(http, createAuth)
 
 export default http
 ```
@@ -476,16 +474,16 @@ There are two options for interacting with Better Auth from Convex. The first op
 
 ```ts
 import { createAuth } from '../src/components/auth';
-import { betterAuthComponent } from './auth';
+import { authComponent } from './auth';
 ```
 ```ts
-const userId = await betterAuthComponent.getAuthUserId(ctx);
-const user = await betterAuthComponent.getAuthUser(ctx);
+const userId = await authComponent.getAuthUserId(ctx);
+const user = await authComponent.getAuthUser(ctx);
 
 const auth = createAuth(ctx);
 
 await auth.api.getSession({
-		headers: await betterAuthComponent.getHeaders(ctx)
+		headers: await authComponent.getHeaders(ctx)
 })
 ```
 
@@ -495,7 +493,7 @@ await auth.api.getSession({
 import { components } from './_generated/api.js';
 ```
 ```ts
-await ctx.runQuery(components.betterAuth.lib.findOne, {
+await ctx.runQuery(components.betterAuth.adapter.findOne, {
 	model: 'user',
 	where: [{ field: 'email', operator: 'eq', value: email }]
 });
