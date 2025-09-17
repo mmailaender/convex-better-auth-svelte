@@ -21,7 +21,6 @@ export const createAuth = (
 		logger: {
 			disabled: optionsOnly
 		},
-    // trustedOrigins: [siteUrl],
 		baseUrl: siteUrl,
 		database: authComponent.adapter(ctx),
 		// Configure simple, non-verified email/password to get started
@@ -48,6 +47,6 @@ export const createAuth = (
 export const getCurrentUser = query({
 	args: {},
 	handler: async (ctx) => {
-		return authComponent.getAuthUser(ctx);
+		return authComponent.safeGetAuthUser(ctx);
 	}
 });
