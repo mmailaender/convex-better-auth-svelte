@@ -7,4 +7,4 @@ Lightweight Svelte/SvelteKit adapter for Convex + Better Auth.
 
 ## License
 
-ISC (Same as MIT but easier to read)
+MIT
