@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated docs to support convex better auth 0.8
+- Updated peer-dependencies
+  - @convex-dev/better-auth@0.8.6
+
 ## 0.0.5
 
 ### Patch Changes
