@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0
+
+### Minor Changes
+
+- fix: refactor createConvexHttpClient from cookie to token - fixes https://github.com/mmailaender/convex-better-auth-svelte/issues/6
+
+
 ## 0.0.6
 
 ### Patch Changes
