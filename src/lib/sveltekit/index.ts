@@ -1,17 +1,18 @@
-import type { betterAuth } from 'better-auth';
 import { createCookieGetter } from 'better-auth/cookies';
-import type { GenericActionCtx } from 'convex/server';
 import type { Cookies, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
 import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
+import { getStaticAuth } from '@convex-dev/better-auth';
+import type { CreateAuth } from '@convex-dev/better-auth';
+import type { GenericDataModel } from "convex/server";
 
-export const getToken = async (
-	createAuth: (ctx: GenericActionCtx<any>) => ReturnType<typeof betterAuth>,
+export const getToken = async <DataModel extends GenericDataModel>(
+	createAuth: CreateAuth<DataModel>,
 	cookies: Cookies
 ) => {
-	const auth = createAuth({} as any);
-	const createCookie = createCookieGetter(auth.options);
+  const options = getStaticAuth(createAuth).options;
+	const createCookie = createCookieGetter(options);
 	const cookie = createCookie(JWT_COOKIE_NAME);
 	const token = cookies.get(cookie.name);
 
