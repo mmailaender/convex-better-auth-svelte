@@ -8,28 +8,49 @@ import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 
 export const getToken = async (
 	createAuth: (ctx: GenericActionCtx<any>) => ReturnType<typeof betterAuth>,
-	cookies: any
+	cookies: Cookies
 ) => {
 	const auth = createAuth({} as any);
 	const createCookie = createCookieGetter(auth.options);
 	const cookie = createCookie(JWT_COOKIE_NAME);
 	const token = cookies.get(cookie.name);
+
+	if (!token) {
+		const isSecure = cookie.name.startsWith('__Secure-');
+		const insecureCookieName = cookie.name.replace('__Secure-', '');
+		const secureCookieName = isSecure ? cookie.name : `__Secure-${insecureCookieName}`;
+
+		const insecureValue = cookies.get(insecureCookieName);
+		const secureValue = cookies.get(secureCookieName);
+
+		// If we expected secure and found insecure set
+		if (isSecure && insecureValue) {
+			console.warn(
+				`Looking for secure cookie "${cookie.name}" but found insecure cookie "${insecureCookieName}".`
+			);
+		}
+
+		// If we expected insecure and found secure set
+		if (!isSecure && secureValue) {
+			console.warn(
+				`Looking for insecure cookie "${cookie.name}" but found secure cookie "${secureCookieName}".`
+			);
+		}
+	}
+
 	return token;
 };
 
 export const createConvexHttpClient = (args: {
-	cookies: Cookies;
+	token?: string;
 	convexUrl?: string;
 	options?: {
 		skipConvexDeploymentUrlCheck?: boolean;
 		logger?: ConvexClientOptions['logger'];
 	};
 }) => {
-	const token = args.cookies.get('better-auth.convex_jwt');
 	const client = new ConvexHttpClient(args.convexUrl ?? PUBLIC_CONVEX_URL, args.options);
-	if (token) {
-		client.setAuth(token);
-	}
+	if (args.token) client.setAuth(args.token);
 	return client;
 };
 
