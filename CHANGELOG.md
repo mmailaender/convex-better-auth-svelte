@@ -1,11 +1,18 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- fix: remove bloated logging for createAuth in getToken
+- Updated dependencies
+  - @mmailaender/convex-better-auth-svelte@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
 
 - fix: refactor createConvexHttpClient from cookie to token - fixes https://github.com/mmailaender/convex-better-auth-svelte/issues/6
-
 
 ## 0.0.6
 
