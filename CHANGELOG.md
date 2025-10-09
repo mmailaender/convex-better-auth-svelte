@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- Rised @convex-dev/better-auth peer dependency to 0.9.0
+- Rised better-auth peer dependency to 1.3.27
+
 ## 0.1.1
 
 ### Patch Changes
