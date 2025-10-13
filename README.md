@@ -33,6 +33,12 @@ Start with fully-featured **Auth & Organization components** that you **own outr
 
 🧩 Get started: [Auth Components →](https://github.com/mmailaender/auth)
 
+<picture>
+    <source srcset="./bannerDark.webp" media="(prefers-color-scheme: dark)">
+    <source srcset="./banner.webp" media="(prefers-color-scheme: light)">
+    <img src="./banner.webp" alt="Auth Logo">
+  </picture>
+
 ---
 
 ## 🪄 Why this adapter
