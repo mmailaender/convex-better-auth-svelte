@@ -31,7 +31,8 @@ Start with fully-featured **Auth & Organization components** that you **own outr
 - Saves *weeks or months* of engineering time
 - Still gives you the same control as building it yourself — just faster
 
-🧩 Get started: [Auth Components →](https://github.com/mmailaender/auth)
+🧩 Get started: [Auth Components →](https://etesie.dev/docs/auth/02-getting-started/01-sveltekit)  
+or explore the full source on [GitHub →](https://github.com/mmailaender/auth)
 
 <picture>
     <source srcset="./bannerDark.webp" media="(prefers-color-scheme: dark)">
