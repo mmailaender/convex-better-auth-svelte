@@ -1,53 +1,53 @@
 # Convex Better Auth – Svelte Adapter
 
-Lightweight Svelte/SvelteKit adapter **wrapping** [`get-convex/better-auth`](https://github.com/get-convex/better-auth) (“Convex Better Auth”) to make it idiomatic to use in Svelte and SvelteKit.
-
-- Documentation: [SvelteKit guide →](https://convex-better-auth.netlify.app/framework-guides/sveltekit)
-- Issues & feature requests: [GitHub issues →](https://github.com/mmailaender/convex-better-auth-svelte/issues)
+A lightweight **Svelte/SvelteKit** adapter for [`get-convex/better-auth`](https://github.com/get-convex/better-auth).  
+It makes authentication **idiomatic**, **type-safe**, and **SSR-ready** in your Convex app.
 
 ---
 
-## 🚀 How do you want to start?
+## Getting started
 
-### 🧪 1) Custom implementation  
-**When to choose this:** You have a very specific opinion about how authentication should work — maybe a custom onboarding flow, invitation logic, or multi-tenant setup that doesn’t fit typical patterns.
+### Option 1 — Ready-to-ship components *(recommended)*
 
-- You’ll wire up sign-in, sign-up, orgs, and sessions yourself.
-- Perfect if you enjoy designing every flow from scratch.
-- Expect days → weeks/months of work depending on polish.
+Start with production-ready **Auth and Organization components** built on top of Convex Better Auth.  
+All source code is **copied into your project (shadcn-style)** — you own and control every line.
 
-📘 Start with the [SvelteKit integration guide →](https://convex-better-auth.netlify.app/framework-guides/sveltekit)
+- Includes full sign-in, sign-up, profile, and organization flows  
+- Choose what you need: user management only, user + organization, or both  
+- Enable or disable features through simple toggles or by editing the code  
+- Fully editable and themeable through your design system  
+- Saves weeks of setup time while keeping complete flexibility  
 
----
-
-### ⚡ 2) Prebuilt components (shadcn-style)
-
-**Recommended for 99 % of projects.**  
-Start with fully-featured **Auth & Organization components** that you **own outright** — all source code is copied into your project.
-
-- Polished UX and responsive layouts built for production
-- 100 % editable, themeable, and extendable
-- No vendor lock-in: everything runs on your Convex instance
-- Saves *weeks or months* of engineering time
-- Still gives you the same control as building it yourself — just faster
-
-🧩 Get started: [Auth Components →](https://etesie.dev/docs/auth/02-getting-started/01-sveltekit)  
-or explore the full source on [GitHub →](https://github.com/mmailaender/auth)
+**Docs:** [Getting started →](https://etesie.dev/docs/auth/02-getting-started/01-sveltekit)  
+**Source:** [github.com/mmailaender/auth →](https://github.com/mmailaender/auth)
 
 <picture>
-    <source srcset="./bannerDark.webp" media="(prefers-color-scheme: dark)">
-    <source srcset="./banner.webp" media="(prefers-color-scheme: light)">
-    <img src="./banner.webp" alt="Auth Logo">
-  </picture>
+  <source srcset="./bannerDark.webp" media="(prefers-color-scheme: dark)">
+  <source srcset="./banner.webp" media="(prefers-color-scheme: light)">
+  <img src="./banner.webp" alt="Auth components preview">
+</picture>
 
 ---
 
-## 🪄 Why this adapter
+### Option 2 — Build from scratch
 
-- ✅ **Svelte ergonomics** on top of Convex Better Auth  
-- 💅 **Zero-lock-in architecture** — your data, your components  
-- 💨 **Works standalone or with prebuilt UI**  
-- 🧠 **Type-safe end-to-end integration via Convex**  
+Choose this path only if you have **highly specific requirements** that make even the ready-to-ship setup unsuitable.  
+For example, a custom onboarding pipeline or experimental multi-tenant logic.
+
+- Integrate `convex-better-auth` directly and build your own UI  
+- Wire up sign-in, sign-up, orgs, and sessions manually  
+- Best for projects with unique data models or non-standard flows  
+
+**Docs:** [SvelteKit integration →](https://convex-better-auth.netlify.app/framework-guides/sveltekit)
+
+---
+
+## Why this adapter
+
+- Svelte-friendly API for Convex Better Auth  
+- Zero lock-in — your Convex, your data, your UI  
+- Works standalone or with ready-to-ship components  
+- Type-safe end-to-end integration via Convex  
 
 ---
 
