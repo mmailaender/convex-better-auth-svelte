@@ -31,12 +31,13 @@ All source code is **copied into your project (shadcn-style)** — you own and c
 
 ### Option 2 — Build from scratch
 
-Choose this path only if you have **highly specific requirements** that make even the ready-to-ship setup unsuitable.  
-For example, a custom onboarding pipeline or experimental multi-tenant logic.
+Use the `convex-better-auth-svelte` adapter to design every flow and UI element yourself.  
+We recommend choosing this path only if you have **highly specific requirements** where even the modular components aren’t a good starting point —  
+for example, experimental onboarding flows or a custom multi-tenant model.
 
-- Integrate `convex-better-auth` directly and build your own UI  
+- Start from the raw hooks and helpers of `convex-better-auth-svelte`  
 - Wire up sign-in, sign-up, orgs, and sessions manually  
-- Best for projects with unique data models or non-standard flows  
+- Best for projects with unique data models or unconventional UX  
 
 **Docs:** [SvelteKit integration →](https://convex-better-auth.netlify.app/framework-guides/sveltekit)
 
