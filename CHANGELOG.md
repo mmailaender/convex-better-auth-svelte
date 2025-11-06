@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- chore: update convex-svelte minimum version to 0.0.12
+This avoids effect in teardown errors by using the new "skip" query option for queries that depend on isAuthenticated. 
+
 ## 0.2.0
 
 ### Minor Changes
