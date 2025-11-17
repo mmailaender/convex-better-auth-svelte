@@ -52,6 +52,34 @@ type AuthContext = {
 	isAuthenticated: boolean;
 };
 
+type ExternalSession = {
+	/**
+	 * Return a Better Auth credential that can be exchanged for a Convex JWT.
+	 *
+	 * This is typically:
+	 * - a device authorization access token (e.g. from the Better Auth deviceAuthorization plugin),
+	 * - or an API key / session token used by a CLI or other non-browser client.
+	 *
+	 * The returned value will be sent as:
+	 *
+	 *   Authorization: Bearer <token>
+	 *
+	 * to the Better Auth Convex plugin's `/convex/token` endpoint.
+	 */
+	getAccessToken: () => string | null | Promise<string | null>;
+};
+
+type CreateSvelteAuthClientBaseArgs = {
+	authClient: AuthClient;
+	convexUrl?: string;
+	convexClient?: ConvexClient;
+	options?: ConvexClientOptions;
+};
+
+type CreateSvelteAuthClientExternalArgs = CreateSvelteAuthClientBaseArgs & {
+	externalSession: ExternalSession;
+};
+
 /**
  * Create a Convex + Better Auth integration for Svelte apps.
  *
@@ -91,7 +119,7 @@ type AuthContext = {
  *   baseURL: import.meta.env.VITE_SITE_URL,
  *   plugins: [convexClient()],
  * });
- * 
+ *
  * createSvelteAuthClient({
  *   authClient,
  *   convexClient,
@@ -110,10 +138,6 @@ type AuthContext = {
  *   from the auth-provider viewpoint,
  * - and still manages `convexClient.setAuth` / `clearAuth` and the combined
  *   `isLoading` / `isAuthenticated` state.
- *
- * You can combine both flows in the same app, but typically you either:
- * - rely purely on `useSession()` (browser), or
- * - rely purely on `externalSession` (headless/device/API key).
  */
 export function createSvelteAuthClient({
 	authClient,
@@ -121,62 +145,58 @@ export function createSvelteAuthClient({
 	convexClient,
 	options,
 	externalSession
-}: {
-	authClient: AuthClient;
-	convexUrl?: string;
-	convexClient?: ConvexClient;
-	options?: ConvexClientOptions;
-	/**
-	 * Return a Better Auth credential that can be exchanged for a Convex JWT.
-	 *
-	 * This is typically:
-	 * - a device authorization access token (e.g. from the Better Auth deviceAuthorization plugin),
-	 * - or an API key / session token used by a CLI or other non-browser client.
-	 *
-	 * The returned value will be sent as:
-	 *
-	 *   Authorization: Bearer <token>
-	 *
-	 * to the Better Auth Convex plugin's `/convex/token` endpoint. If you return
-	 * `null`, the user is treated as unauthenticated from the auth-provider
-	 * perspective.
-	 */
-	externalSession?: {
-		getAccessToken: () => string | null | Promise<string | null>;
-	};
-}) {
+}: CreateSvelteAuthClientBaseArgs & { externalSession?: ExternalSession }) {
+	if (externalSession) {
+		// External / headless flow (device auth, API keys, CLIs, Figma, etc.)
+		return createSvelteAuthClientExternal({
+			authClient,
+			convexUrl,
+			convexClient,
+			options,
+			externalSession
+		});
+	}
+
+	// Default: browser flow with Better Auth session cookies
+	return createSvelteAuthClientBrowser({
+		authClient,
+		convexUrl,
+		convexClient,
+		options
+	});
+}
+
+/**
+ * Browser / cookie-based Better Auth + Convex integration.
+ */
+function createSvelteAuthClientBrowser({
+	authClient,
+	convexUrl,
+	convexClient: passedConvexClient,
+	options
+}: CreateSvelteAuthClientBaseArgs) {
 	let sessionData: SessionState['data'] | null = $state(null);
 	let sessionPending: boolean = $state(true);
 
-	let hasExternalCredential: boolean = $state(false);
-
 	let isConvexAuthenticated: boolean | null = $state(null);
 
-	if (!externalSession) {
-		authClient.useSession().subscribe((session) => {
-			const wasAuthenticated = sessionData !== null;
-			sessionData = session.data;
-			sessionPending = session.isPending;
+	authClient.useSession().subscribe((session) => {
+		const wasAuthenticated = sessionData !== null;
+		sessionData = session.data;
+		sessionPending = session.isPending;
 
-			// If session state changed from authenticated to unauthenticated, reset Convex auth
-			const isNowAuthenticated = sessionData !== null;
-			if (wasAuthenticated && !isNowAuthenticated) {
-				isConvexAuthenticated = false;
-			}
-			// If we went back to loading state, reset Convex auth to null
-			if (session.isPending && isConvexAuthenticated !== null) {
-				isConvexAuthenticated = null;
-			}
-		});
-	} else {
-		// In external-only mode, we don't have a Better Auth session store,
-		// so there is no pending state on that side.
-		sessionPending = false;
-	}
+		// If session state changed from authenticated to unauthenticated, reset Convex auth
+		const isNowAuthenticated = sessionData !== null;
+		if (wasAuthenticated && !isNowAuthenticated) {
+			isConvexAuthenticated = false;
+		}
+		// If we went back to loading state, reset Convex auth to null
+		if (session.isPending && isConvexAuthenticated !== null) {
+			isConvexAuthenticated = null;
+		}
+	});
 
-	const isAuthProviderAuthenticated = $derived(
-		externalSession ? hasExternalCredential : sessionData !== null
-	);
+	const isAuthProviderAuthenticated = $derived(sessionData !== null);
 
 	const isAuthenticated = $derived(isAuthProviderAuthenticated && (isConvexAuthenticated ?? false));
 
@@ -184,26 +204,6 @@ export function createSvelteAuthClient({
 	const isLoading = $derived(
 		sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
 	);
-
-	const fetchAccessToken = async ({
-		forceRefreshToken
-	}: {
-		forceRefreshToken: boolean;
-	}): Promise<string | null> => {
-		// In external session mode, always try to fetch a Convex JWT.
-		if (externalSession) {
-			const token = await fetchToken();
-			logVerbose(`external: returning ${token ? 'token' : 'null'}`);
-			return token;
-		}
-		// Browser / cookie mode: only fetch on explicit refresh requests
-		if (forceRefreshToken) {
-			const token = await fetchToken();
-			logVerbose(`returning retrieved token`);
-			return token;
-		}
-		return null;
-	};
 
 	const url =
 		convexUrl ??
@@ -213,6 +213,8 @@ export function createSvelteAuthClient({
 				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
 			);
 		})();
+
+	let convexClient = passedConvexClient;
 	// Initialize the Convex client if not provided
 	if (!convexClient) {
 		convexClient = setupConvexClient(url, { disabled: false, ...options });
@@ -224,68 +226,20 @@ export function createSvelteAuthClient({
 		}
 	};
 
-	const fetchToken = async (): Promise<string | null> => {
-		const initialBackoff = 100;
-		const maxBackoff = 1000;
-		let retries = 0;
-
-		const nextBackoff = () => {
-			const baseBackoff = initialBackoff * Math.pow(2, retries);
-			retries += 1;
-			const actualBackoff = Math.min(baseBackoff, maxBackoff);
-			const jitter = actualBackoff * (Math.random() - 0.5);
-			return actualBackoff + jitter;
-		};
-
-		const fetchWithRetry = async (): Promise<string | null> => {
-			try {
-				if (externalSession) {
-					const rawToken = await externalSession.getAccessToken();
-
-					if (!rawToken) {
-						logVerbose(`no external access token available`);
-						hasExternalCredential = false;
-						return null;
-					}
-
-					hasExternalCredential = true;
-
-					const { data } = await authClient.convex.token(undefined, {
-						headers: {
-							Authorization: `Bearer ${rawToken}`
-						}
-					});
-
-					return data?.token ?? null;
-				}
-
-				// Browser / cookie-based session
-				const { data } = await authClient.convex.token();
-				return data?.token ?? null;
-			} catch (e) {
-				if (!isNetworkError(e)) {
-					// For external mode, a non-network error (e.g. 401) means our
-					// credential is invalid; mark it as gone.
-					if (externalSession) {
-						hasExternalCredential = false;
-					}
-					throw e;
-				}
-				if (retries > 10) {
-					logVerbose(`fetchToken failed with network error, giving up`);
-					throw e;
-				}
-				const backoff = nextBackoff();
-				logVerbose(`fetchToken failed with network error, attempting retry in ${backoff}ms`);
-				await new Promise((resolve) => setTimeout(resolve, backoff));
-				return fetchWithRetry();
-			}
-		};
-
-		return fetchWithRetry();
+	const fetchAccessToken = async ({
+		forceRefreshToken
+	}: {
+		forceRefreshToken: boolean;
+	}): Promise<string | null> => {
+		if (forceRefreshToken) {
+			const token = await fetchTokenBrowser(authClient, logVerbose);
+			logVerbose(`returning retrieved token`);
+			return token;
+		}
+		return null;
 	};
 
-	// TODO: This needs to be eventually an reactive effect if someone adds an OTT to the URL programatically.
+	// TODO: This needs to be eventually a reactive effect if someone adds an OTT to the URL programmatically.
 	// Call the one-time token handler
 	onMount(() => {
 		handleOneTimeToken(authClient);
@@ -295,35 +249,127 @@ export function createSvelteAuthClient({
 	$effect(() => {
 		let effectRelevant = true;
 
-		if (externalSession) {
-			// External flow: always setAuth; fetchAccessToken will return a Convex JWT or null
-			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
-				if (effectRelevant) isConvexAuthenticated = backendReportsIsAuthenticated;
+		if (isAuthProviderAuthenticated) {
+			// Set auth with callback to receive backend confirmation
+			convexClient!.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
+				if (effectRelevant) {
+					isConvexAuthenticated = backendReportsIsAuthenticated;
+				}
 			});
-			return () => {
-				effectRelevant = false;
-				isConvexAuthenticated = isConvexAuthenticated ? false : null;
-			};
-		}
 
-		// Browser / cookie-based session flow: keep the session gate
-		if (sessionData !== null) {
-			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
-				if (effectRelevant) isConvexAuthenticated = backendReportsIsAuthenticated;
-			});
+			// Cleanup function
 			return () => {
 				effectRelevant = false;
+				// If unmounting or something changed before we finished fetching the token
+				// we shouldn't transition to a loaded state.
 				isConvexAuthenticated = isConvexAuthenticated ? false : null;
 			};
 		} else {
-			convexClient.client.clearAuth();
+			// Clear auth when not authenticated
+			convexClient!.client.clearAuth();
+			// Also run cleanup for clearing
 			return () => {
+				// Set state back to loading in case this is a transition from one
+				// fetchToken function to another
 				isConvexAuthenticated = null;
 			};
 		}
 	});
 
 	// Set context to make auth state available to useAuth
+	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
+		authClient,
+		fetchAccessToken,
+		get isLoading() {
+			return isLoading;
+		},
+		get isAuthenticated() {
+			return isAuthenticated;
+		}
+	});
+}
+
+/**
+ * External / headless Better Auth + Convex integration.
+ *
+ * This is used when you have an externalSession (device authorization, API key,
+ * CLI token, etc.) and do not rely on Better Auth's browser session cookies.
+ */
+function createSvelteAuthClientExternal({
+	authClient,
+	convexUrl,
+	convexClient: passedConvexClient,
+	options,
+	externalSession
+}: CreateSvelteAuthClientExternalArgs) {
+	let isConvexAuthenticated: boolean | null = $state(null);
+
+	const isAuthenticated = $derived(isConvexAuthenticated ?? false);
+	const isLoading = $derived(isConvexAuthenticated === null);
+
+	const url =
+		convexUrl ??
+		PUBLIC_CONVEX_URL ??
+		(() => {
+			throw new Error(
+				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
+			);
+		})();
+
+	let convexClient = passedConvexClient;
+	if (!convexClient) {
+		convexClient = setupConvexClient(url, { disabled: false, ...options });
+	}
+
+	const logVerbose = (message: string) => {
+		if (options?.verbose) {
+			console.debug(`${new Date().toISOString()} ${message}`);
+		}
+	};
+
+	const fetchAccessToken = async ({
+		forceRefreshToken
+	}: {
+		forceRefreshToken: boolean;
+	}): Promise<string | null> => {
+		// For external flows we ignore forceRefreshToken and always try to
+		// exchange the external credential for a Convex JWT.
+		const rawToken = await externalSession.getAccessToken();
+		if (!rawToken) {
+			logVerbose('external: no access token');
+			return null;
+		}
+		try {
+			const { data } = await authClient.convex.token(undefined, {
+				headers: {
+					Authorization: `Bearer ${rawToken}`
+				}
+			});
+			return data?.token ?? null;
+		} catch (e) {
+			if (!isNetworkError(e)) {
+				throw e;
+			}
+			logVerbose('external: network error when fetching Convex JWT');
+			return null;
+		}
+	};
+
+	$effect(() => {
+		let effectRelevant = true;
+
+		convexClient!.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
+			if (effectRelevant) {
+				isConvexAuthenticated = backendReportsIsAuthenticated;
+			}
+		});
+
+		return () => {
+			effectRelevant = false;
+			isConvexAuthenticated = isConvexAuthenticated ? false : null;
+		};
+	});
+
 	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
 		authClient,
 		fetchAccessToken,
@@ -374,6 +420,44 @@ const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => 
 	}
 
 	return client;
+};
+
+const fetchTokenBrowser = async (
+	authClient: AuthClient,
+	logVerbose: (message: string) => void
+): Promise<string | null> => {
+	const initialBackoff = 100;
+	const maxBackoff = 1000;
+	let retries = 0;
+
+	const nextBackoff = () => {
+		const baseBackoff = initialBackoff * Math.pow(2, retries);
+		retries += 1;
+		const actualBackoff = Math.min(baseBackoff, maxBackoff);
+		const jitter = actualBackoff * (Math.random() - 0.5);
+		return actualBackoff + jitter;
+	};
+
+	const fetchWithRetry = async (): Promise<string | null> => {
+		try {
+			const { data } = await authClient.convex.token();
+			return data?.token || null;
+		} catch (e) {
+			if (!isNetworkError(e)) {
+				throw e;
+			}
+			if (retries > 10) {
+				logVerbose(`fetchToken failed with network error, giving up`);
+				throw e;
+			}
+			const backoff = nextBackoff();
+			logVerbose(`fetchToken failed with network error, attempting retrying in ${backoff}ms`);
+			await new Promise((resolve) => setTimeout(resolve, backoff));
+			return fetchWithRetry();
+		}
+	};
+
+	return fetchWithRetry();
 };
 
 // Handle one-time token verification (equivalent to useEffect)
