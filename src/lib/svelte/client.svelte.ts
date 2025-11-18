@@ -177,7 +177,6 @@ function createSvelteAuthClientBrowser({
 }: CreateSvelteAuthClientBaseArgs) {
 	let sessionData: SessionState['data'] | null = $state(null);
 	let sessionPending: boolean = $state(true);
-
 	let isConvexAuthenticated: boolean | null = $state(null);
 
 	authClient.useSession().subscribe((session) => {
@@ -197,9 +196,7 @@ function createSvelteAuthClientBrowser({
 	});
 
 	const isAuthProviderAuthenticated = $derived(sessionData !== null);
-
 	const isAuthenticated = $derived(isAuthProviderAuthenticated && (isConvexAuthenticated ?? false));
-
 	// Loading state - we're loading if session is pending OR if we have a session but no Convex confirmation yet
 	const isLoading = $derived(
 		sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
@@ -239,7 +236,6 @@ function createSvelteAuthClientBrowser({
 		return null;
 	};
 
-	// TODO: This needs to be eventually a reactive effect if someone adds an OTT to the URL programmatically.
 	// Call the one-time token handler
 	onMount(() => {
 		handleOneTimeToken(authClient);
@@ -292,8 +288,7 @@ function createSvelteAuthClientBrowser({
 /**
  * External / headless Better Auth + Convex integration.
  *
- * This is used when you have an externalSession (device authorization, API key,
- * CLI token, etc.) and do not rely on Better Auth's browser session cookies.
+ * This is used when you have an externalSession (device authorization) and do not rely on Better Auth's browser session cookies.
  */
 function createSvelteAuthClientExternal({
 	authClient,
@@ -303,7 +298,6 @@ function createSvelteAuthClientExternal({
 	externalSession
 }: CreateSvelteAuthClientExternalArgs) {
 	let isConvexAuthenticated: boolean | null = $state(null);
-
 	const isAuthenticated = $derived(isConvexAuthenticated ?? false);
 	const isLoading = $derived(isConvexAuthenticated === null);
 
@@ -327,11 +321,7 @@ function createSvelteAuthClientExternal({
 		}
 	};
 
-	const fetchAccessToken = async ({
-		forceRefreshToken
-	}: {
-		forceRefreshToken: boolean;
-	}): Promise<string | null> => {
+	const fetchAccessToken = async (): Promise<string | null> => {
 		// For external flows we ignore forceRefreshToken and always try to
 		// exchange the external credential for a Convex JWT.
 		const rawToken = await externalSession.getAccessToken();
