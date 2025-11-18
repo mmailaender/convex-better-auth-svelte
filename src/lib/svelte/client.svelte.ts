@@ -10,6 +10,10 @@ import type { BetterAuthClientPlugin, ClientOptions } from 'better-auth';
 import type { createAuthClient } from 'better-auth/svelte';
 import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
 
+/* -------------------------------------------------------------------------- */
+/*                                  Types                                     */
+/* -------------------------------------------------------------------------- */
+
 export type ConvexAuthClient = {
 	verbose?: boolean;
 	logger?: Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>;
@@ -42,12 +46,14 @@ type ExtractSessionState<T> = T extends {
 	: never;
 type SessionState = ExtractSessionState<ReturnType<AuthClient['useSession']>>;
 
+type FetchAccessToken = (options: { forceRefreshToken: boolean }) => Promise<string | null>;
+
 // Context key for sharing auth client and functions
 const AUTH_CONTEXT_KEY = Symbol('auth-context');
 
 type AuthContext = {
 	authClient: AuthClient;
-	fetchAccessToken: (options: { forceRefreshToken: boolean }) => Promise<string | null>;
+	fetchAccessToken: FetchAccessToken;
 	isLoading: boolean;
 	isAuthenticated: boolean;
 };
@@ -79,6 +85,10 @@ type CreateSvelteAuthClientBaseArgs = {
 type CreateSvelteAuthClientExternalArgs = CreateSvelteAuthClientBaseArgs & {
 	externalSession: ExternalSession;
 };
+
+/* -------------------------------------------------------------------------- */
+/*                          Public entrypoint                                 */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Create a Convex + Better Auth integration for Svelte apps.
@@ -166,9 +176,35 @@ export function createSvelteAuthClient({
 	});
 }
 
-/**
- * Browser / cookie-based Better Auth + Convex integration.
- */
+/* -------------------------------------------------------------------------- */
+/*                        Shared internal helpers                             */
+/* -------------------------------------------------------------------------- */
+
+const resolveConvexClient = (
+	convexUrl: string | undefined,
+	passedConvexClient: ConvexClient | undefined,
+	options?: ConvexClientOptions
+) => {
+	const url =
+		convexUrl ??
+		PUBLIC_CONVEX_URL ??
+		(() => {
+			throw new Error(
+				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
+			);
+		})();
+
+	let convexClient = passedConvexClient;
+	if (!convexClient) {
+		convexClient = setupConvexClient(url, { disabled: false, ...options });
+	}
+	return { url, convexClient };
+};
+
+/* -------------------------------------------------------------------------- */
+/*                     Browser / cookie-based integration                      */
+/* -------------------------------------------------------------------------- */
+
 function createSvelteAuthClientBrowser({
 	authClient,
 	convexUrl,
@@ -202,20 +238,7 @@ function createSvelteAuthClientBrowser({
 		sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
 	);
 
-	const url =
-		convexUrl ??
-		PUBLIC_CONVEX_URL ??
-		(() => {
-			throw new Error(
-				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
-			);
-		})();
-
-	let convexClient = passedConvexClient;
-	// Initialize the Convex client if not provided
-	if (!convexClient) {
-		convexClient = setupConvexClient(url, { disabled: false, ...options });
-	}
+	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
 
 	const logVerbose = (message: string) => {
 		if (options?.verbose) {
@@ -223,31 +246,20 @@ function createSvelteAuthClientBrowser({
 		}
 	};
 
-	const fetchAccessToken = async ({
-		forceRefreshToken
-	}: {
-		forceRefreshToken: boolean;
-	}): Promise<string | null> => {
-		if (forceRefreshToken) {
-			const token = await fetchTokenBrowser(authClient, logVerbose);
-			logVerbose(`returning retrieved token`);
-			return token;
-		}
-		return null;
-	};
+	const fetchAccessToken = makeFetchAccessTokenBrowser(authClient, logVerbose);
 
 	// Call the one-time token handler
 	onMount(() => {
 		handleOneTimeToken(authClient);
 	});
 
-	// Updated effect to handle backend confirmation
+	// Effect to handle Convex backend confirmation
 	$effect(() => {
 		let effectRelevant = true;
 
 		if (isAuthProviderAuthenticated) {
 			// Set auth with callback to receive backend confirmation
-			convexClient!.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
+			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
 				if (effectRelevant) {
 					isConvexAuthenticated = backendReportsIsAuthenticated;
 				}
@@ -262,7 +274,7 @@ function createSvelteAuthClientBrowser({
 			};
 		} else {
 			// Clear auth when not authenticated
-			convexClient!.client.clearAuth();
+			convexClient.client.clearAuth();
 			// Also run cleanup for clearing
 			return () => {
 				// Set state back to loading in case this is a transition from one
@@ -285,6 +297,10 @@ function createSvelteAuthClientBrowser({
 	});
 }
 
+/* -------------------------------------------------------------------------- */
+/*                     External / headless integration                         */
+/* -------------------------------------------------------------------------- */
+
 /**
  * External / headless Better Auth + Convex integration.
  *
@@ -301,19 +317,7 @@ function createSvelteAuthClientExternal({
 	const isAuthenticated = $derived(isConvexAuthenticated ?? false);
 	const isLoading = $derived(isConvexAuthenticated === null);
 
-	const url =
-		convexUrl ??
-		PUBLIC_CONVEX_URL ??
-		(() => {
-			throw new Error(
-				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
-			);
-		})();
-
-	let convexClient = passedConvexClient;
-	if (!convexClient) {
-		convexClient = setupConvexClient(url, { disabled: false, ...options });
-	}
+	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
 
 	const logVerbose = (message: string) => {
 		if (options?.verbose) {
@@ -321,7 +325,63 @@ function createSvelteAuthClientExternal({
 		}
 	};
 
-	const fetchAccessToken = async (): Promise<string | null> => {
+	const fetchAccessToken = makeFetchAccessTokenExternal(authClient, externalSession, logVerbose);
+
+	$effect(() => {
+		let effectRelevant = true;
+
+		convexClient.setAuth(
+			// Convex still calls this as fetchAccessToken({ forceRefreshToken })
+			// so we keep the signature and ignore the parameter here.
+			(options) => fetchAccessToken(options),
+			(backendReportsIsAuthenticated: boolean) => {
+				if (effectRelevant) {
+					isConvexAuthenticated = backendReportsIsAuthenticated;
+				}
+			}
+		);
+
+		return () => {
+			effectRelevant = false;
+			isConvexAuthenticated = isConvexAuthenticated ? false : null;
+		};
+	});
+
+	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
+		authClient,
+		fetchAccessToken,
+		get isLoading() {
+			return isLoading;
+		},
+		get isAuthenticated() {
+			return isAuthenticated;
+		}
+	});
+}
+
+/* -------------------------------------------------------------------------- */
+/*                     Top-level fetchAccessToken helpers                      */
+/* -------------------------------------------------------------------------- */
+
+const makeFetchAccessTokenBrowser = (
+	authClient: AuthClient,
+	logVerbose: (message: string) => void
+): FetchAccessToken => {
+	return async ({ forceRefreshToken }) => {
+		if (!forceRefreshToken) return null;
+
+		const token = await fetchTokenBrowser(authClient, logVerbose);
+		logVerbose('browser: returning retrieved token');
+		return token;
+	};
+};
+
+const makeFetchAccessTokenExternal = (
+	authClient: AuthClient,
+	externalSession: ExternalSession,
+	logVerbose: (message: string) => void
+): FetchAccessToken => {
+	return async () => {
 		// For external flows we ignore forceRefreshToken and always try to
 		// exchange the external credential for a Convex JWT.
 		const rawToken = await externalSession.getAccessToken();
@@ -344,33 +404,11 @@ function createSvelteAuthClientExternal({
 			return null;
 		}
 	};
+};
 
-	$effect(() => {
-		let effectRelevant = true;
-
-		convexClient!.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
-			if (effectRelevant) {
-				isConvexAuthenticated = backendReportsIsAuthenticated;
-			}
-		});
-
-		return () => {
-			effectRelevant = false;
-			isConvexAuthenticated = isConvexAuthenticated ? false : null;
-		};
-	});
-
-	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
-		authClient,
-		fetchAccessToken,
-		get isLoading() {
-			return isLoading;
-		},
-		get isAuthenticated() {
-			return isAuthenticated;
-		}
-	});
-}
+/* -------------------------------------------------------------------------- */
+/*                          Convex client helper                              */
+/* -------------------------------------------------------------------------- */
 
 const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => {
 	// Client resolution priority:
@@ -405,12 +443,16 @@ const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => 
 	// If we still don't have a client, throw an error
 	if (!client) {
 		throw new Error(
-			'No ConvexClient was provided. Either pass one to setupConvexAuth or call setupConvex() first.'
+			'No ConvexClient was provided. Either pass one to createSvelteAuthClient or call setupConvex() first.'
 		);
 	}
 
 	return client;
 };
+
+/* -------------------------------------------------------------------------- */
+/*                          Token helpers                                     */
+/* -------------------------------------------------------------------------- */
 
 const fetchTokenBrowser = async (
 	authClient: AuthClient,
@@ -475,6 +517,10 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 	}
 };
 
+/* -------------------------------------------------------------------------- */
+/*                               useAuth hook                                 */
+/* -------------------------------------------------------------------------- */
+
 /**
  * Hook to access authentication state and functions
  * Must be used within a component that has createSvelteAuthClient called in its parent tree
@@ -482,11 +528,7 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 export const useAuth = (): {
 	isLoading: boolean;
 	isAuthenticated: boolean;
-	fetchAccessToken: ({
-		forceRefreshToken
-	}: {
-		forceRefreshToken: boolean;
-	}) => Promise<string | null>;
+	fetchAccessToken: FetchAccessToken;
 } => {
 	const authContext = getContext<AuthContext>(AUTH_CONTEXT_KEY);
 
