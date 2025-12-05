@@ -19,7 +19,7 @@ All source code is **copied into your project (shadcn-style)** — you own and c
 - Saves weeks of setup time while keeping complete flexibility  
 
 **Docs:** [Getting started →](https://etesie.dev/docs/auth/02-getting-started/01-sveltekit)  
-**Source:** [github.com/mmailaender/auth →](https://github.com/mmailaender/auth)
+**Source:** [github.com/mmailaender/Convex-Better-Auth-UI →](https://github.com/mmailaender/Convex-Better-Auth-UI)
 
 <picture>
   <source srcset="./bannerDark.webp" media="(prefers-color-scheme: dark)">
