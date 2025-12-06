@@ -6,7 +6,7 @@ import { setupConvex } from 'convex-svelte';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
-import type { BetterAuthClientPlugin, ClientOptions } from 'better-auth';
+import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-auth';
 import type { createAuthClient } from 'better-auth/svelte';
 import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
 
@@ -30,7 +30,7 @@ type PluginsWithoutCrossDomain = (ConvexClientBetterAuth | BetterAuthClientPlugi
 type AuthClientWithPlugins<Plugins extends PluginsWithCrossDomain | PluginsWithoutCrossDomain> =
 	ReturnType<
 		typeof createAuthClient<
-			ClientOptions & {
+			BetterAuthClientOptions & {
 				plugins: Plugins;
 			}
 		>
@@ -75,11 +75,38 @@ type ExternalSession = {
 	getAccessToken: () => string | null | Promise<string | null>;
 };
 
+/**
+ * Initial auth state from server for SSR.
+ * Used to avoid loading flash on initial page render.
+ */
+export type InitialAuthState = {
+	isAuthenticated: boolean;
+};
+
 type CreateSvelteAuthClientBaseArgs = {
 	authClient: AuthClient;
 	convexUrl?: string;
 	convexClient?: ConvexClient;
 	options?: ConvexClientOptions;
+	/**
+	 * Optional getter for server-side auth state.
+	 * When provided, the auth state will be initialized with the server state
+	 * to avoid loading flash on initial render.
+	 *
+	 * @example
+	 * ```svelte
+	 * <!-- +layout.svelte -->
+	 * <script lang="ts">
+	 *   let { children, data } = $props();
+	 *
+	 *   createSvelteAuthClient({
+	 *     authClient,
+	 *     getServerState: () => data.authState
+	 *   });
+	 * </script>
+	 * ```
+	 */
+	getServerState?: () => InitialAuthState | undefined;
 };
 
 type CreateSvelteAuthClientExternalArgs = CreateSvelteAuthClientBaseArgs & {
@@ -154,7 +181,8 @@ export function createSvelteAuthClient({
 	convexUrl,
 	convexClient,
 	options,
-	externalSession
+	externalSession,
+	getServerState
 }: CreateSvelteAuthClientBaseArgs & { externalSession?: ExternalSession }) {
 	if (externalSession) {
 		// External / headless flow (device auth, API keys, CLIs, Figma, etc.)
@@ -172,7 +200,8 @@ export function createSvelteAuthClient({
 		authClient,
 		convexUrl,
 		convexClient,
-		options
+		options,
+		getServerState
 	});
 }
 
@@ -209,16 +238,33 @@ function createSvelteAuthClientBrowser({
 	authClient,
 	convexUrl,
 	convexClient: passedConvexClient,
-	options
+	options,
+	getServerState
 }: CreateSvelteAuthClientBaseArgs) {
+	// Get initial state from server if available
+	const serverState = getServerState?.();
+	$inspect(serverState, 'serverState client.svelte.ts');
+	const hasServerAuth = serverState?.isAuthenticated === true;
+
+	// Initialize state
 	let sessionData: SessionState['data'] | null = $state(null);
 	let sessionPending: boolean = $state(true);
-	let isConvexAuthenticated: boolean | null = $state(null);
+	let isConvexAuthenticated: boolean | null = $state(hasServerAuth ? true : null);
+	// Track whether client has received any data from the session subscription
+	let hasReceivedClientData = $state(false);
+	// Track whether we've ever had a definitive (non-pending) answer from the client
+	let hasEverSettled = $state(false);
 
 	authClient.useSession().subscribe((session) => {
+		hasReceivedClientData = true;
 		const wasAuthenticated = sessionData !== null;
 		sessionData = session.data;
 		sessionPending = session.isPending;
+
+		// Track when we first get a definitive answer
+		if (!session.isPending) {
+			hasEverSettled = true;
+		}
 
 		// If session state changed from authenticated to unauthenticated, reset Convex auth
 		const isNowAuthenticated = sessionData !== null;
@@ -226,16 +272,31 @@ function createSvelteAuthClientBrowser({
 			isConvexAuthenticated = false;
 		}
 		// If we went back to loading state, reset Convex auth to null
-		if (session.isPending && isConvexAuthenticated !== null) {
+		// But only after we've settled once (not during initial hydration with server auth)
+		if (session.isPending && isConvexAuthenticated !== null && hasEverSettled) {
 			isConvexAuthenticated = null;
 		}
 	});
 
 	const isAuthProviderAuthenticated = $derived(sessionData !== null);
-	const isAuthenticated = $derived(isAuthProviderAuthenticated && (isConvexAuthenticated ?? false));
-	// Loading state - we're loading if session is pending OR if we have a session but no Convex confirmation yet
+
+	// Client takes over once we've received a definitive answer (not pending)
+	// This ensures server state is used during the initial pending phase
+	const clientHasTakenOver = $derived(hasReceivedClientData && !sessionPending);
+
+	const isAuthenticated = $derived(
+		clientHasTakenOver
+			? isAuthProviderAuthenticated && (isConvexAuthenticated ?? false)
+			: hasServerAuth // Trust server state during initial hydration
+	);
+
+	// Loading state:
+	// - Before client data: loading unless we have server auth state
+	// - After client data: loading if session pending OR waiting for Convex confirmation
 	const isLoading = $derived(
-		sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
+		clientHasTakenOver
+			? sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
+			: !hasServerAuth // Loading if no server state, not loading if server says authenticated
 	);
 
 	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
@@ -254,10 +315,16 @@ function createSvelteAuthClientBrowser({
 	});
 
 	// Effect to handle Convex backend confirmation
+	// Set auth when:
+	// 1. We have server auth (to immediately set up Convex auth on hydration)
+	// 2. OR when Better Auth session is available
 	$effect(() => {
 		let effectRelevant = true;
 
-		if (isAuthProviderAuthenticated) {
+		// Set auth if we have server auth OR Better Auth session
+		const shouldSetAuth = hasServerAuth || isAuthProviderAuthenticated;
+
+		if (shouldSetAuth) {
 			// Set auth with callback to receive backend confirmation
 			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
 				if (effectRelevant) {
@@ -275,10 +342,7 @@ function createSvelteAuthClientBrowser({
 		} else {
 			// Clear auth when not authenticated
 			convexClient.client.clearAuth();
-			// Also run cleanup for clearing
 			return () => {
-				// Set state back to loading in case this is a transition from one
-				// fetchToken function to another
 				isConvexAuthenticated = null;
 			};
 		}

@@ -1,8 +1,8 @@
 import { createClient, type GenericCtx } from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
-import { components } from './_generated/api';
-import { type DataModel } from './_generated/dataModel';
-import { query } from './_generated/server';
+import { components } from './_generated/api.js';
+import { type DataModel } from './_generated/dataModel.js';
+import { query } from './_generated/server.js';
 import { betterAuth } from 'better-auth';
 
 const siteUrl = process.env.SITE_URL!;
@@ -48,5 +48,16 @@ export const getCurrentUser = query({
 	args: {},
 	handler: async (ctx) => {
 		return authComponent.safeGetAuthUser(ctx);
+	}
+});
+
+// Public query for testing - no auth required
+export const getPublicData = query({
+	args: {},
+	handler: async () => {
+		return {
+			message: 'This is public data',
+			timestamp: Date.now()
+		};
 	}
 });
