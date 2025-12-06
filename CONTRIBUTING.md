@@ -82,12 +82,12 @@ pnpm run test:e2e:ui
 
 The E2E tests cover these authentication scenarios:
 
-| Scenario | Description |
-|----------|-------------|
+| Scenario          | Description                                             |
+| ----------------- | ------------------------------------------------------- |
 | SSR Authenticated | User is authenticated via SSR, sees content immediately |
-| SSR → Sign Out | Authenticated user signs out |
-| Client-only Auth | User signs in without SSR state |
-| Protected Queries | Queries that require authentication |
+| SSR → Sign Out    | Authenticated user signs out                            |
+| Client-only Auth  | User signs in without SSR state                         |
+| Protected Queries | Queries that require authentication                     |
 
 ## Project Structure
 
@@ -116,13 +116,13 @@ The E2E tests cover these authentication scenarios:
 
 ### Route Overview
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page with links |
-| `/dev` | Development playground with full auth demo |
-| `/test/ssr` | SSR authentication test page |
-| `/test/client-only` | Client-only authentication test page |
-| `/test/queries` | Public/protected query behavior test page |
+| Route               | Purpose                                    |
+| ------------------- | ------------------------------------------ |
+| `/`                 | Landing page with links                    |
+| `/dev`              | Development playground with full auth demo |
+| `/test/ssr`         | SSR authentication test page               |
+| `/test/client-only` | Client-only authentication test page       |
+| `/test/queries`     | Public/protected query behavior test page  |
 
 ## Code Style
 

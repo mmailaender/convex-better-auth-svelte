@@ -19,8 +19,8 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-	<header class="bg-white border-b border-gray-200 sticky top-0 z-10">
-		<nav class="max-w-4xl mx-auto px-4 py-3">
+	<header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
+		<nav class="mx-auto max-w-4xl px-4 py-3">
 			<div class="flex items-center justify-between">
 				<a href="/" class="font-semibold text-gray-900 hover:text-gray-700">
 					convex-better-auth-svelte
@@ -30,9 +30,9 @@
 						<li>
 							<a
 								href={link.path}
-								class="px-3 py-1.5 rounded-md transition-colors {page.url.pathname === link.path
-									? 'bg-gray-100 text-gray-900 font-medium'
-									: 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+								class="rounded-md px-3 py-1.5 transition-colors {page.url.pathname === link.path
+									? 'bg-gray-100 font-medium text-gray-900'
+									: 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}"
 							>
 								{link.label}
 							</a>

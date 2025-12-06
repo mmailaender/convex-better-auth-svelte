@@ -16,13 +16,17 @@
 	$inspect(auth.isLoading, 'isLoading');
 	$inspect(auth.isAuthenticated, 'isAuthenticated');
 
-	const currentUserResponse = useQuery(api.auth.getCurrentUser, () => auth.isAuthenticated ?{} : "skip", () => ({
-		initialData: data.currentUser,
-    keepPreviousData: true
-	}));
+	const currentUserResponse = useQuery(
+		api.auth.getCurrentUser,
+		() => (auth.isAuthenticated ? {} : 'skip'),
+		() => ({
+			initialData: data.currentUser,
+			keepPreviousData: true
+		})
+	);
 	let user = $derived(currentUserResponse.data);
-  $inspect(currentUserResponse, "currentUserResponse")
-  $inspect(user, "user")
+	$inspect(currentUserResponse, 'currentUserResponse');
+	$inspect(user, 'user');
 
 	// Sign in/up form state
 	let showSignIn = $state(true);
