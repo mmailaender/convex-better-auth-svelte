@@ -27,12 +27,12 @@
 	);
 </script>
 
-<div class="p-8 max-w-2xl mx-auto">
-	<h1 class="text-2xl font-bold mb-6">Query Behavior Test</h1>
+<div class="mx-auto max-w-2xl p-8">
+	<h1 class="mb-6 text-2xl font-bold">Query Behavior Test</h1>
 
 	<div class="space-y-4">
-		<div class="p-4 bg-gray-100 rounded" data-testid="auth-state">
-			<h2 class="font-semibold mb-2">Auth State</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="auth-state">
+			<h2 class="mb-2 font-semibold">Auth State</h2>
 			<ul class="space-y-1 text-sm">
 				<li data-testid="is-loading">
 					<strong>isLoading:</strong>
@@ -45,8 +45,8 @@
 			</ul>
 		</div>
 
-		<div class="p-4 bg-blue-50 rounded" data-testid="public-query">
-			<h2 class="font-semibold mb-2">Public Query (always runs)</h2>
+		<div class="rounded bg-blue-50 p-4" data-testid="public-query">
+			<h2 class="mb-2 font-semibold">Public Query (always runs)</h2>
 			{#if publicQueryResponse.isLoading}
 				<p data-testid="public-loading">Loading...</p>
 			{:else if publicQueryResponse.data}
@@ -59,8 +59,8 @@
 			{/if}
 		</div>
 
-		<div class="p-4 bg-purple-50 rounded" data-testid="protected-query">
-			<h2 class="font-semibold mb-2">Protected Query (auth required)</h2>
+		<div class="rounded bg-purple-50 p-4" data-testid="protected-query">
+			<h2 class="mb-2 font-semibold">Protected Query (auth required)</h2>
 			{#if auth.isLoading}
 				<p data-testid="protected-auth-loading">Checking auth...</p>
 			{:else if !auth.isAuthenticated}
@@ -74,8 +74,8 @@
 			{/if}
 		</div>
 
-		<div class="p-4 bg-gray-50 rounded" data-testid="ssr-data">
-			<h2 class="font-semibold mb-2">SSR Initial Data</h2>
+		<div class="rounded bg-gray-50 p-4" data-testid="ssr-data">
+			<h2 class="mb-2 font-semibold">SSR Initial Data</h2>
 			<p data-testid="ssr-public">
 				<strong>publicData:</strong>
 				{data.publicData?.message ?? 'null'}

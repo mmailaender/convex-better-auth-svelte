@@ -19,7 +19,7 @@ export const getToken = async <DataModel extends GenericDataModel>(
 	createAuth: CreateAuth<DataModel>,
 	cookies: Cookies
 ) => {
-  const options = getStaticAuth(createAuth).options;
+	const options = getStaticAuth(createAuth).options;
 	const createCookie = createCookieGetter(options);
 	const cookie = createCookie(JWT_COOKIE_NAME);
 	const token = cookies.get(cookie.name);

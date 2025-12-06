@@ -5,7 +5,6 @@
 	let { children, data } = $props();
 	// createSvelteAuthClient({ authClient });
 	createSvelteAuthClient({ authClient, getServerState: () => data.authState });
-
 </script>
 
 {@render children()}

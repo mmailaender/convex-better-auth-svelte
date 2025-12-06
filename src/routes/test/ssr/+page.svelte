@@ -23,12 +23,12 @@
 	}
 </script>
 
-<div class="p-8 max-w-2xl mx-auto">
-	<h1 class="text-2xl font-bold mb-6">SSR Authentication Test</h1>
+<div class="mx-auto max-w-2xl p-8">
+	<h1 class="mb-6 text-2xl font-bold">SSR Authentication Test</h1>
 
 	<div class="space-y-4">
-		<div class="p-4 bg-gray-100 rounded" data-testid="auth-state">
-			<h2 class="font-semibold mb-2">Auth State</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="auth-state">
+			<h2 class="mb-2 font-semibold">Auth State</h2>
 			<ul class="space-y-1 text-sm">
 				<li data-testid="is-loading">
 					<strong>isLoading:</strong>
@@ -41,8 +41,8 @@
 			</ul>
 		</div>
 
-		<div class="p-4 bg-gray-100 rounded" data-testid="user-data">
-			<h2 class="font-semibold mb-2">User Data</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="user-data">
+			<h2 class="mb-2 font-semibold">User Data</h2>
 			{#if currentUserResponse.isLoading}
 				<p data-testid="user-loading">Loading user...</p>
 			{:else if currentUserResponse.data}
@@ -52,8 +52,8 @@
 			{/if}
 		</div>
 
-		<div class="p-4 bg-gray-100 rounded" data-testid="ssr-data">
-			<h2 class="font-semibold mb-2">SSR Initial Data</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="ssr-data">
+			<h2 class="mb-2 font-semibold">SSR Initial Data</h2>
 			<p data-testid="ssr-auth-state">
 				<strong>authState.isAuthenticated:</strong>
 				{data.authState?.isAuthenticated ?? 'undefined'}
@@ -65,12 +65,12 @@
 		</div>
 
 		<!-- Actions -->
-		<div class="p-4 bg-gray-100 rounded" data-testid="actions">
-			<h2 class="font-semibold mb-2">Actions</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="actions">
+			<h2 class="mb-2 font-semibold">Actions</h2>
 			{#if auth.isAuthenticated}
 				<button
 					onclick={handleSignOut}
-					class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+					class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
 					data-testid="sign-out-button"
 				>
 					Sign Out

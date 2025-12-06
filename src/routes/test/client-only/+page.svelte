@@ -33,13 +33,13 @@
 	}
 </script>
 
-<div class="p-8 max-w-2xl mx-auto">
-	<h1 class="text-2xl font-bold mb-6">Client-Only Authentication Test</h1>
-	<p class="text-gray-600 mb-6">This page has NO SSR auth state. Auth is purely client-side.</p>
+<div class="mx-auto max-w-2xl p-8">
+	<h1 class="mb-6 text-2xl font-bold">Client-Only Authentication Test</h1>
+	<p class="mb-6 text-gray-600">This page has NO SSR auth state. Auth is purely client-side.</p>
 
 	<div class="space-y-4">
-		<div class="p-4 bg-gray-100 rounded" data-testid="auth-state">
-			<h2 class="font-semibold mb-2">Auth State</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="auth-state">
+			<h2 class="mb-2 font-semibold">Auth State</h2>
 			<ul class="space-y-1 text-sm">
 				<li data-testid="is-loading">
 					<strong>isLoading:</strong>
@@ -52,8 +52,8 @@
 			</ul>
 		</div>
 
-		<div class="p-4 bg-gray-100 rounded" data-testid="user-data">
-			<h2 class="font-semibold mb-2">User Data</h2>
+		<div class="rounded bg-gray-100 p-4" data-testid="user-data">
+			<h2 class="mb-2 font-semibold">User Data</h2>
 			{#if auth.isLoading}
 				<p data-testid="user-loading">Loading...</p>
 			{:else if currentUserResponse.isLoading}
@@ -66,22 +66,26 @@
 		</div>
 
 		{#if auth.isLoading}
-			<div class="p-4 bg-yellow-100 rounded" data-testid="loading-state">
+			<div class="rounded bg-yellow-100 p-4" data-testid="loading-state">
 				<p>Checking authentication...</p>
 			</div>
 		{:else if auth.isAuthenticated}
-			<div class="p-4 bg-green-100 rounded" data-testid="authenticated-state">
+			<div class="rounded bg-green-100 p-4" data-testid="authenticated-state">
 				<p class="mb-2">You are signed in!</p>
 				<button
 					onclick={handleSignOut}
-					class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+					class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
 					data-testid="sign-out-button"
 				>
 					Sign Out
 				</button>
 			</div>
 		{:else}
-			<form onsubmit={handleSignIn} class="p-4 bg-gray-100 rounded space-y-4" data-testid="sign-in-form">
+			<form
+				onsubmit={handleSignIn}
+				class="space-y-4 rounded bg-gray-100 p-4"
+				data-testid="sign-in-form"
+			>
 				<h2 class="font-semibold">Sign In</h2>
 				<div>
 					<label for="email" class="block text-sm font-medium">Email</label>
@@ -108,7 +112,7 @@
 				<button
 					type="submit"
 					disabled={isSubmitting}
-					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+					class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
 					data-testid="sign-in-button"
 				>
 					{isSubmitting ? 'Signing in...' : 'Sign In'}
