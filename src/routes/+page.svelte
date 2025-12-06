@@ -1,172 +1,80 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client.js';
-	import { api } from '$convex/_generated/api.js';
-	import { useQuery } from 'convex-svelte';
-	import { useAuth } from '$lib/svelte/index.js';
-
-	let { data } = $props();
-
-	// Auth state store
-	const auth = useAuth();
-	const isLoading = $derived(auth.isLoading && !data.currentUser);
-	const isAuthenticated = $derived(auth.isAuthenticated || !!data.currentUser);
-
-	const currentUserResponse = useQuery(api.auth.getCurrentUser, {});
-	let user = $derived(currentUserResponse.data ?? data.currentUser);
-
-	// Sign in/up form state
-	let showSignIn = $state(true);
-	let name = $state('');
-	let email = $state('');
-	let password = $state('');
-
-	// Handle form submission
-	async function handlePasswordSubmit(event: Event) {
-		event.preventDefault();
-
-		try {
-			if (showSignIn) {
-				await authClient.signIn.email(
-					{ email, password },
-					{
-						onError: (ctx) => {
-							alert(ctx.error.message);
-						}
-					}
-				);
-			} else {
-				await authClient.signUp.email(
-					{ name, email, password },
-					{
-						onError: (ctx) => {
-							alert(ctx.error.message);
-						}
-					}
-				);
-			}
-		} catch (error) {
-			console.error('Authentication error:', error);
+	const devRoutes = [
+		{
+			title: 'Development Playground',
+			path: '/dev',
+			description: 'Full SSR auth demo with sign in/out functionality'
 		}
-	}
+	];
 
-	// Sign out function
-	async function signOut() {
-		
-		const result = await authClient.signOut();
-		if(result.error) {
-			console.error('Sign out error:', result.error);
+	const testRoutes = [
+		{
+			title: 'SSR Auth Test',
+			path: '/test/ssr',
+			description: 'Tests SSR authentication state and hydration'
+		},
+		{
+			title: 'Client-Only Auth Test',
+			path: '/test/client-only',
+			description: 'Tests client-side only authentication (no SSR)'
+		},
+		{
+			title: 'Query Behavior Test',
+			path: '/test/queries',
+			description: 'Tests public and protected query behavior'
 		}
-	}
-
-	// Toggle between sign in and sign up
-	function toggleSignMode() {
-		showSignIn = !showSignIn;
-		// Clear form fields when toggling
-		name = '';
-		email = '';
-		password = '';
-	}
-
-	// Demo: Fetch access token
-	let accessToken = $state<string | null>(null);
-	let tokenLoading = $state(false);
-
-	async function fetchToken() {
-		tokenLoading = true;
-		try {
-			const token = await auth.fetchAccessToken({ forceRefreshToken: true });
-			accessToken = token;
-		} catch (error) {
-			console.error('Error fetching access token:', error);
-			accessToken = 'Error fetching token';
-		} finally {
-			tokenLoading = false;
-		}
-	}
+	];
 </script>
 
-<div class="flex h-screen flex-col items-center justify-center bg-gray-50">
-	{#if isLoading}
-		<div class="text-lg text-gray-600">Loading...</div>
-	{:else if !isAuthenticated}
-		<!-- Sign In Component -->
-		<div class="flex w-full max-w-md flex-col gap-4 rounded-lg bg-white p-6 shadow-md">
-			<h2 class="mb-6 text-center text-2xl font-bold text-gray-800">
-				{showSignIn ? 'Sign In' : 'Sign Up'}
-			</h2>
+<div class="max-w-2xl mx-auto py-12 px-4">
+	<h1 class="text-3xl font-bold text-gray-900 mb-2">convex-better-auth-svelte</h1>
+	<p class="text-gray-600 mb-8">Convex + Better Auth integration for Svelte/SvelteKit</p>
 
-			<form onsubmit={handlePasswordSubmit} class="flex flex-col gap-4">
-				{#if !showSignIn}
-					<input
-						bind:value={name}
-						placeholder="Name"
-						required
-						class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
-					/>
-				{/if}
-				<input
-					type="email"
-					bind:value={email}
-					placeholder="Email"
-					required
-					class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
-				/>
-				<input
-					type="password"
-					bind:value={password}
-					placeholder="Password"
-					required
-					class="rounded-md border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
-				/>
-				<button
-					type="submit"
-					class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+	<!-- Development Section -->
+	<section class="mb-10">
+		<h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+			<span class="w-2 h-2 bg-green-500 rounded-full"></span>
+			Development
+		</h2>
+		<div class="space-y-3">
+			{#each devRoutes as route}
+				<a
+					href={route.path}
+					class="block p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-green-200 hover:border-green-400"
 				>
-					{showSignIn ? 'Sign in' : 'Sign up'}
-				</button>
-			</form>
-
-			<p class="mt-4 text-center text-gray-600">
-				{showSignIn ? "Don't have an account? " : 'Already have an account? '}
-				<button
-					type="button"
-					onclick={toggleSignMode}
-					class="cursor-pointer border-none bg-transparent text-blue-600 underline hover:text-blue-800"
-				>
-					{showSignIn ? 'Sign up' : 'Sign in'}
-				</button>
-			</p>
+					<h3 class="text-lg font-semibold text-gray-900">{route.title}</h3>
+					<p class="text-sm text-gray-600 mt-1">{route.description}</p>
+					<span class="text-xs text-green-600 mt-2 inline-block">{route.path}</span>
+				</a>
+			{/each}
 		</div>
-	{:else if isAuthenticated}
-		<!-- Dashboard Component -->
-		<div class="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-md">
-			<div class="mb-4 text-xl font-semibold text-gray-800">
-				Hello {user?.name}!
-			</div>
+	</section>
 
-			<!-- Demo: Access Token Section -->
-			<div class="mb-4 rounded-md bg-gray-50 p-4">
-				<h3 class="mb-2 text-sm font-medium text-gray-700">Access Token Demo</h3>
-				<button
-					onclick={fetchToken}
-					disabled={tokenLoading}
-					class="cursor-pointer rounded-md bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+	<!-- Test Routes Section -->
+	<section class="mb-10">
+		<h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+			<span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+			Test Routes
+		</h2>
+		<div class="space-y-3">
+			{#each testRoutes as route}
+				<a
+					href={route.path}
+					class="block p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-purple-200 hover:border-purple-400"
 				>
-					{tokenLoading ? 'Fetching...' : 'Fetch Access Token'}
-				</button>
-				{#if accessToken}
-					<div class="mt-2 rounded border bg-white p-2 text-xs break-all text-gray-600">
-						{accessToken.length > 50 ? accessToken.substring(0, 50) + '...' : accessToken}
-					</div>
-				{/if}
-			</div>
-
-			<button
-				onclick={signOut}
-				class="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
-			>
-				Sign out
-			</button>
+					<h3 class="text-lg font-semibold text-gray-900">{route.title}</h3>
+					<p class="text-sm text-gray-600 mt-1">{route.description}</p>
+					<span class="text-xs text-purple-600 mt-2 inline-block">{route.path}</span>
+				</a>
+			{/each}
 		</div>
-	{/if}
+	</section>
+
+	<!-- E2E Tests Info -->
+	<section class="p-4 bg-gray-100 rounded-lg border border-gray-200">
+		<h3 class="font-semibold text-gray-900 mb-2">Run E2E Tests</h3>
+		<p class="text-sm text-gray-600">
+			Execute <code class="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-xs">pnpm test:e2e</code> to run all test scenarios with Playwright.
+		</p>
+	</section>
 </div>
