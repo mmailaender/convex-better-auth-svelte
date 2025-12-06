@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- Add SSR initialization for auth client
+
 ## 0.3.0
 
 ### Minor Changes
