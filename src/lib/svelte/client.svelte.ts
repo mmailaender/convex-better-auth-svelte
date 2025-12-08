@@ -243,7 +243,6 @@ function createSvelteAuthClientBrowser({
 }: CreateSvelteAuthClientBaseArgs) {
 	// Get initial state from server if available
 	const serverState = getServerState?.();
-	$inspect(serverState, 'serverState client.svelte.ts');
 	const hasServerAuth = serverState?.isAuthenticated === true;
 
 	// Initialize state
