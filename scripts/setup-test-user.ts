@@ -12,7 +12,7 @@ import { config } from 'dotenv';
 // Load .env.test file
 config({ path: '.env.test' });
 
-const SITE_URL = process.env.PUBLIC_SITE_URL || 'http://localhost:5173';
+const SITE_URL = process.env.SITE_URL || 'http://localhost:5173';
 
 async function setupTestUser() {
 	const email = process.env.TEST_USER_EMAIL;
