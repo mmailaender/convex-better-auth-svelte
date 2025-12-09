@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2
+
+### Patch Changes
+
+- fix: initialize correctly auth.isLoading with false if the client receives the server state during ssr.
+
 ## 0.4.1
 
 ### Patch Changes
