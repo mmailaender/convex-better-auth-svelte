@@ -243,6 +243,7 @@ function createSvelteAuthClientBrowser({
 }: CreateSvelteAuthClientBaseArgs) {
 	// Get initial state from server if available
 	const serverState = getServerState?.();
+	const hasServerState = serverState !== undefined;
 	const hasServerAuth = serverState?.isAuthenticated === true;
 
 	// Initialize state
@@ -290,12 +291,12 @@ function createSvelteAuthClientBrowser({
 	);
 
 	// Loading state:
-	// - Before client data: loading unless we have server auth state
+	// - Before client data: loading unless we have server state (authenticated OR unauthenticated)
 	// - After client data: loading if session pending OR waiting for Convex confirmation
 	const isLoading = $derived(
 		clientHasTakenOver
 			? sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
-			: !hasServerAuth // Loading if no server state, not loading if server says authenticated
+			: !hasServerState // Loading only if no server state at all
 	);
 
 	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
