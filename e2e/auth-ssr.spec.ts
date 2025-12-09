@@ -45,6 +45,27 @@ test.describe('SSR Authentication', () => {
 		await expect(page.locator('[data-testid="user-email"]')).toBeVisible();
 		await expect(page.locator('[data-testid="user-none"]')).not.toBeVisible();
 	});
+
+	test('no loading flash on initial SSR render when authenticated', async ({ page }) => {
+		// Capture the initial HTML state immediately after navigation
+		// This catches bugs where isLoading flashes before settling
+		const response = await page.goto('/test/ssr');
+		expect(response?.status()).toBe(200);
+
+		// Get initial DOM state BEFORE any client-side hydration effects
+		const initialState = await page.evaluate(() => {
+			const isLoadingEl = document.querySelector('[data-testid="is-loading"]');
+			const isAuthEl = document.querySelector('[data-testid="is-authenticated"]');
+			return {
+				isLoading: isLoadingEl?.textContent?.includes('true'),
+				isAuthenticated: isAuthEl?.textContent?.includes('true')
+			};
+		});
+
+		// SSR should render isLoading: false immediately (no flash)
+		expect(initialState.isLoading).toBe(false);
+		expect(initialState.isAuthenticated).toBe(true);
+	});
 });
 
 test.describe('SSR Not Authenticated', () => {
@@ -61,6 +82,27 @@ test.describe('SSR Not Authenticated', () => {
 
 		// SSR auth state should show not authenticated
 		await expect(page.locator('[data-testid="ssr-auth-state"]')).toContainText('false');
+	});
+
+	test('no loading flash on initial SSR render when unauthenticated', async ({ page }) => {
+		// Capture the initial HTML state immediately after navigation
+		// This catches bugs where isLoading starts as true then becomes false
+		const response = await page.goto('/test/ssr');
+		expect(response?.status()).toBe(200);
+
+		// Get initial DOM state BEFORE any client-side hydration effects
+		const initialState = await page.evaluate(() => {
+			const isLoadingEl = document.querySelector('[data-testid="is-loading"]');
+			const isAuthEl = document.querySelector('[data-testid="is-authenticated"]');
+			return {
+				isLoading: isLoadingEl?.textContent?.includes('true'),
+				isAuthenticated: isAuthEl?.textContent?.includes('true')
+			};
+		});
+
+		// SSR should render isLoading: false immediately (no flash)
+		expect(initialState.isLoading).toBe(false);
+		expect(initialState.isAuthenticated).toBe(false);
 	});
 });
 
@@ -103,6 +145,33 @@ test.describe('Client-only Authentication', () => {
 
 		// isAuthenticated should be false
 		await expect(page.locator('[data-testid="is-authenticated"]')).toContainText('false');
+	});
+
+	test('isLoading is true on initial render without SSR state', async ({ page }) => {
+		// Capture the initial HTML state immediately after navigation
+		// Without SSR state, isLoading should be true initially
+		const response = await page.goto('/test/client-only');
+		expect(response?.status()).toBe(200);
+
+		// Get initial DOM state - should show loading since no SSR state
+		const initialState = await page.evaluate(() => {
+			const isLoadingEl = document.querySelector('[data-testid="is-loading"]');
+			const loadingStateEl = document.querySelector('[data-testid="loading-state"]');
+			return {
+				isLoadingText: isLoadingEl?.textContent?.includes('true'),
+				loadingStateVisible: loadingStateEl !== null
+			};
+		});
+
+		// Without SSR state, isLoading should be true initially
+		expect(initialState.isLoadingText).toBe(true);
+		expect(initialState.loadingStateVisible).toBe(true);
+
+		// Wait for auth to resolve - should show sign-in form
+		await expect(page.locator('[data-testid="sign-in-form"]')).toBeVisible({ timeout: 10000 });
+
+		// After resolution, isLoading should be false
+		await expect(page.locator('[data-testid="is-loading"]')).toContainText('false');
 	});
 
 	test('can sign in from unauthenticated state', async ({ page }) => {
