@@ -10,8 +10,6 @@
 	const auth = useAuth();
 	const isLoading = $derived(auth.isLoading);
 	const isAuthenticated = $derived(auth.isAuthenticated);
-	// const isLoading = $derived(auth.isLoading && !data.currentUser);
-	// const isAuthenticated = $derived(auth.isAuthenticated || !!data.currentUser);
 
 	$inspect(auth.isLoading, 'isLoading');
 	$inspect(auth.isAuthenticated, 'isAuthenticated');
