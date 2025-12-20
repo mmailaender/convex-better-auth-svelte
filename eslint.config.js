@@ -1,5 +1,6 @@
 import prettier from 'eslint-config-prettier';
 import svelte from 'eslint-plugin-svelte';
+import convex from '@convex-dev/eslint-plugin';
 import svelteParser from 'svelte-eslint-parser';
 import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
@@ -11,6 +12,7 @@ export default [
 
 	prettier,
 	...svelte.configs.prettier,
+	...convex.configs.recommended,
 	{
 		languageOptions: {
 			globals: {
