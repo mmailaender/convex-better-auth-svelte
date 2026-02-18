@@ -103,6 +103,7 @@ const handler = (request: Request, opts?: { convexSiteUrl?: string }) => {
 
 	const nextUrl = `${convexSiteUrl}${requestUrl.pathname}${requestUrl.search}`;
 	const newRequest = new Request(nextUrl, request);
+	newRequest.headers.set('host', new URL(nextUrl).host);
 	newRequest.headers.set('accept-encoding', 'application/json');
 
 	return fetch(newRequest, { method: request.method, redirect: 'manual' });
