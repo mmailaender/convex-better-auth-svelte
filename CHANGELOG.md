@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+### Patch Changes
+
+- fix: Sets the host header on the proxied request to match the target Convex URL instead of copying the original request's host => Prevents request loops when both the frontend and Convex are behind the same reverse proxy (e.g. Traefik)
+
 ## 0.5.0
 
 ### Minor Changes
