@@ -48,16 +48,13 @@ describe('createSvelteKitHandler', () => {
 	it('should proxy to the correct URL with path and query params', async () => {
 		const { GET } = createSvelteKitHandler();
 
-		const incomingRequest = new Request(
-			'https://app.example.com/api/auth/callback?code=abc123',
-			{ headers: { host: 'app.example.com' } }
-		);
+		const incomingRequest = new Request('https://app.example.com/api/auth/callback?code=abc123', {
+			headers: { host: 'app.example.com' }
+		});
 
 		await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
 
 		expect(capturedRequest).toBeDefined();
-		expect(capturedRequest!.url).toBe(
-			'https://convex.example.com/api/auth/callback?code=abc123'
-		);
+		expect(capturedRequest!.url).toBe('https://convex.example.com/api/auth/callback?code=abc123');
 	});
 });

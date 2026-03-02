@@ -299,6 +299,18 @@ function createSvelteAuthClientBrowser({
 			: !hasServerState // Loading only if no server state at all
 	);
 
+	// Whether the Convex client should have auth set.
+	// During hydration: trust server auth OR Better Auth session.
+	// After client settles: only trust Better Auth session, so that
+	// sign-out properly reaches clearAuth() even when the page was
+	// originally loaded while signed in (hasServerAuth would be stale).
+	// IMPORTANT: this MUST be a $derived (memoized) so the $effect below
+	// only re-runs when the boolean result actually changes — not when
+	// intermediate inputs like clientHasTakenOver transition.
+	const shouldSetAuth = $derived(
+		clientHasTakenOver ? isAuthProviderAuthenticated : hasServerAuth || isAuthProviderAuthenticated
+	);
+
 	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
 
 	const logVerbose = (message: string) => {
@@ -315,14 +327,8 @@ function createSvelteAuthClientBrowser({
 	});
 
 	// Effect to handle Convex backend confirmation
-	// Set auth when:
-	// 1. We have server auth (to immediately set up Convex auth on hydration)
-	// 2. OR when Better Auth session is available
 	$effect(() => {
 		let effectRelevant = true;
-
-		// Set auth if we have server auth OR Better Auth session
-		const shouldSetAuth = hasServerAuth || isAuthProviderAuthenticated;
 
 		if (shouldSetAuth) {
 			// Set auth with callback to receive backend confirmation

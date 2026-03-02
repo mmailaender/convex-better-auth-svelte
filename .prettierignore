@@ -9,3 +9,6 @@ bun.lockb
 /static/
 
 _generated
+
+# npm pack output
+*.tgz
