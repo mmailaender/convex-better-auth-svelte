@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+### Patch Changes
+
+- Fix: client auth state to properly handle sign-out after SSR hydration
+
 ## 0.5.1
 
 ### Patch Changes
