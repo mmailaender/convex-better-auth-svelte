@@ -250,13 +250,11 @@ function createSvelteAuthClientBrowser({
 	let sessionData: SessionState['data'] | null = $state(null);
 	let sessionPending: boolean = $state(true);
 	let isConvexAuthenticated: boolean | null = $state(hasServerAuth ? true : null);
-	// Track whether client has received any data from the session subscription
-	let hasReceivedClientData = $state(false);
-	// Track whether we've ever had a definitive (non-pending) answer from the client
+	// Track whether we've ever had a definitive (non-pending) answer from the client.
+	// Once true it never reverts — this is the "client has taken over" latch.
 	let hasEverSettled = $state(false);
 
 	authClient.useSession().subscribe((session) => {
-		hasReceivedClientData = true;
 		const wasAuthenticated = sessionData !== null;
 		sessionData = session.data;
 		sessionPending = session.isPending;
@@ -280,9 +278,11 @@ function createSvelteAuthClientBrowser({
 
 	const isAuthProviderAuthenticated = $derived(sessionData !== null);
 
-	// Client takes over once we've received a definitive answer (not pending)
-	// This ensures server state is used during the initial pending phase
-	const clientHasTakenOver = $derived(hasReceivedClientData && !sessionPending);
+	// Client takes over once we've received a definitive (non-pending) answer.
+	// hasEverSettled is a one-way latch: once the client has settled, we never
+	// fall back to (potentially stale) server state, even if the session goes
+	// pending again (e.g. after sign-in → goto).
+	const clientHasTakenOver = $derived(hasEverSettled);
 
 	const isAuthenticated = $derived(
 		clientHasTakenOver

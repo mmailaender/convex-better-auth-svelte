@@ -11,13 +11,15 @@ interface AuthState {
 	hasServerState: boolean;
 	sessionData: unknown;
 	sessionPending: boolean;
-	hasReceivedClientData: boolean;
+	hasEverSettled: boolean;
 	isConvexAuthenticated: boolean | null;
 }
 
 function computeDerived(s: AuthState) {
 	const isAuthProviderAuthenticated = s.sessionData !== null;
-	const clientHasTakenOver = s.hasReceivedClientData && !s.sessionPending;
+	// hasEverSettled is a one-way latch: once the client has settled,
+	// we never fall back to (potentially stale) server state.
+	const clientHasTakenOver = s.hasEverSettled;
 
 	// THE FIX – shouldSetAuth as a memoized $derived outside the $effect.
 	// Before the fix this was  `hasServerAuth || isAuthProviderAuthenticated`
@@ -62,7 +64,7 @@ describe('shouldSetAuth computation (the core fix)', () => {
 			hasServerState: true,
 			sessionData: null,
 			sessionPending: true,
-			hasReceivedClientData: false,
+			hasEverSettled: false,
 			isConvexAuthenticated: true
 		});
 		expect(d.clientHasTakenOver).toBe(false);
@@ -75,7 +77,7 @@ describe('shouldSetAuth computation (the core fix)', () => {
 			hasServerState: true,
 			sessionData: { user: { id: '1' } },
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: true
 		});
 		expect(d.clientHasTakenOver).toBe(true);
@@ -88,7 +90,7 @@ describe('shouldSetAuth computation (the core fix)', () => {
 			hasServerState: true,
 			sessionData: null, // signed out
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: false
 		});
 		expect(d.clientHasTakenOver).toBe(true);
@@ -102,7 +104,7 @@ describe('shouldSetAuth computation (the core fix)', () => {
 			hasServerState: true,
 			sessionData: { user: { id: '2' } },
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: null
 		});
 		expect(d.clientHasTakenOver).toBe(true);
@@ -117,7 +119,7 @@ describe('shouldSetAuth computation (the core fix)', () => {
 			hasServerState: true,
 			sessionData: null,
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: false
 		};
 		expect(computeShouldSetAuthOriginal(signedOutState)).toBe(true); // old: bug
@@ -132,7 +134,7 @@ describe('shouldSetAuth – hasServerAuth=false (fresh page load)', () => {
 			hasServerState: true,
 			sessionData: null,
 			sessionPending: true,
-			hasReceivedClientData: false,
+			hasEverSettled: false,
 			isConvexAuthenticated: null
 		});
 		expect(d.shouldSetAuth).toBe(false);
@@ -144,7 +146,7 @@ describe('shouldSetAuth – hasServerAuth=false (fresh page load)', () => {
 			hasServerState: true,
 			sessionData: { user: { id: '1' } },
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: null
 		});
 		expect(d.shouldSetAuth).toBe(true);
@@ -156,7 +158,7 @@ describe('shouldSetAuth – hasServerAuth=false (fresh page load)', () => {
 			hasServerState: true,
 			sessionData: null,
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: false
 		});
 		expect(d.shouldSetAuth).toBe(false);
@@ -171,7 +173,7 @@ describe('isAuthenticated derivation', () => {
 				hasServerState: true,
 				sessionData: null,
 				sessionPending: true,
-				hasReceivedClientData: false,
+				hasEverSettled: false,
 				isConvexAuthenticated: true
 			}).isAuthenticated
 		).toBe(true);
@@ -184,7 +186,7 @@ describe('isAuthenticated derivation', () => {
 				hasServerState: true,
 				sessionData: { user: { id: '1' } },
 				sessionPending: false,
-				hasReceivedClientData: true,
+				hasEverSettled: true,
 				isConvexAuthenticated: null // not yet confirmed
 			}).isAuthenticated
 		).toBe(false);
@@ -195,7 +197,7 @@ describe('isAuthenticated derivation', () => {
 				hasServerState: true,
 				sessionData: { user: { id: '1' } },
 				sessionPending: false,
-				hasReceivedClientData: true,
+				hasEverSettled: true,
 				isConvexAuthenticated: true
 			}).isAuthenticated
 		).toBe(true);
@@ -208,7 +210,7 @@ describe('isAuthenticated derivation', () => {
 				hasServerState: true,
 				sessionData: null,
 				sessionPending: false,
-				hasReceivedClientData: true,
+				hasEverSettled: true,
 				isConvexAuthenticated: false
 			}).isAuthenticated
 		).toBe(false);
@@ -223,7 +225,7 @@ describe('isLoading derivation', () => {
 				hasServerState: true,
 				sessionData: null,
 				sessionPending: true,
-				hasReceivedClientData: false,
+				hasEverSettled: false,
 				isConvexAuthenticated: true
 			}).isLoading
 		).toBe(false);
@@ -236,7 +238,7 @@ describe('isLoading derivation', () => {
 				hasServerState: false,
 				sessionData: null,
 				sessionPending: true,
-				hasReceivedClientData: false,
+				hasEverSettled: false,
 				isConvexAuthenticated: null
 			}).isLoading
 		).toBe(true);
@@ -249,7 +251,7 @@ describe('isLoading derivation', () => {
 				hasServerState: true,
 				sessionData: { user: { id: '1' } },
 				sessionPending: false,
-				hasReceivedClientData: true,
+				hasEverSettled: true,
 				isConvexAuthenticated: null // pending
 			}).isLoading
 		).toBe(true);
@@ -262,7 +264,7 @@ describe('isLoading derivation', () => {
 				hasServerState: true,
 				sessionData: { user: { id: '1' } },
 				sessionPending: false,
-				hasReceivedClientData: true,
+				hasEverSettled: true,
 				isConvexAuthenticated: true
 			}).isLoading
 		).toBe(false);
@@ -289,7 +291,7 @@ describe('effect branching (state machine)', () => {
 					hasServerState: true,
 					sessionData: null,
 					sessionPending: true,
-					hasReceivedClientData: false,
+					hasEverSettled: false,
 					isConvexAuthenticated: true
 				}
 			},
@@ -300,7 +302,7 @@ describe('effect branching (state machine)', () => {
 					hasServerState: true,
 					sessionData: { user: { id: '1' } },
 					sessionPending: false,
-					hasReceivedClientData: true,
+					hasEverSettled: true,
 					isConvexAuthenticated: true
 				}
 			},
@@ -311,7 +313,7 @@ describe('effect branching (state machine)', () => {
 					hasServerState: true,
 					sessionData: null,
 					sessionPending: false,
-					hasReceivedClientData: true,
+					hasEverSettled: true,
 					isConvexAuthenticated: false
 				}
 			},
@@ -322,7 +324,7 @@ describe('effect branching (state machine)', () => {
 					hasServerState: true,
 					sessionData: { user: { id: '2' } },
 					sessionPending: false,
-					hasReceivedClientData: true,
+					hasEverSettled: true,
 					isConvexAuthenticated: null
 				}
 			}
@@ -357,7 +359,7 @@ describe('effect branching (state machine)', () => {
 			hasServerState: true,
 			sessionData: null,
 			sessionPending: false,
-			hasReceivedClientData: true,
+			hasEverSettled: true,
 			isConvexAuthenticated: false
 		};
 		const signedInState: AuthState = {
@@ -374,5 +376,121 @@ describe('effect branching (state machine)', () => {
 		// Fixed code: sign-out transitions to false
 		expect(computeDerived(signedOutState).shouldSetAuth).toBe(false);
 		expect(computeDerived(signedInState).shouldSetAuth).toBe(true);
+	});
+});
+
+describe('Issue #21: no unauthenticated flash after sign-in + client-side navigation', () => {
+	// Scenario: SSR layout loaded while unauthenticated (hasServerAuth=false, hasServerState=true).
+	// User signs in → session goes pending → clientHasTakenOver must stay true
+	// so we don't fall back to stale hasServerAuth=false.
+
+	it('session pending after settlement keeps clientHasTakenOver=true (latch)', () => {
+		// After first settlement, session goes pending again (e.g. sign-in triggers re-fetch)
+		const d = computeDerived({
+			hasServerAuth: false,
+			hasServerState: true,
+			sessionData: null,
+			sessionPending: true,
+			hasEverSettled: true, // already settled once before
+			isConvexAuthenticated: null
+		});
+		// Key assertion: clientHasTakenOver stays true even though session is pending
+		expect(d.clientHasTakenOver).toBe(true);
+		// Uses client logic: isLoading = sessionPending || ... = true (shows spinner)
+		expect(d.isLoading).toBe(true);
+		// NOT the buggy fallback: isLoading = !hasServerState = false
+	});
+
+	it('SSR unauthenticated + session pending after sign-in shows loading, not unauthenticated', () => {
+		// This is the exact bug scenario from issue #21:
+		// SSR says "not authed", user signs in, session goes pending during goto()
+		const d = computeDerived({
+			hasServerAuth: false,
+			hasServerState: true,
+			sessionData: null,
+			sessionPending: true,
+			hasEverSettled: true,
+			isConvexAuthenticated: null
+		});
+
+		// MUST NOT show isAuthenticated=false + isLoading=false (the unauthenticated flash)
+		const isFlash = !d.isAuthenticated && !d.isLoading;
+		expect(isFlash).toBe(false);
+
+		// Should show loading state instead
+		expect(d.isLoading).toBe(true);
+	});
+
+	it('sign-in lifecycle with SSR unauthenticated produces no flash', () => {
+		const steps: { label: string; state: AuthState }[] = [
+			{
+				label: '1. SSR hydration (unauthenticated)',
+				state: {
+					hasServerAuth: false,
+					hasServerState: true,
+					sessionData: null,
+					sessionPending: true,
+					hasEverSettled: false,
+					isConvexAuthenticated: null
+				}
+			},
+			{
+				label: '2. Client settles as unauthenticated',
+				state: {
+					hasServerAuth: false,
+					hasServerState: true,
+					sessionData: null,
+					sessionPending: false,
+					hasEverSettled: true,
+					isConvexAuthenticated: null
+				}
+			},
+			{
+				label: '3. User signs in, session goes pending',
+				state: {
+					hasServerAuth: false,
+					hasServerState: true,
+					sessionData: null,
+					sessionPending: true,
+					hasEverSettled: true,
+					isConvexAuthenticated: null
+				}
+			},
+			{
+				label: '4. Session settles with user data',
+				state: {
+					hasServerAuth: false,
+					hasServerState: true,
+					sessionData: { user: { id: '1' } },
+					sessionPending: false,
+					hasEverSettled: true,
+					isConvexAuthenticated: null
+				}
+			},
+			{
+				label: '5. Convex backend confirms',
+				state: {
+					hasServerAuth: false,
+					hasServerState: true,
+					sessionData: { user: { id: '1' } },
+					sessionPending: false,
+					hasEverSettled: true,
+					isConvexAuthenticated: true
+				}
+			}
+		];
+
+		// After step 2 (initial settlement), there should never be a state
+		// where isAuthenticated=false AND isLoading=false (the unauthenticated flash)
+		for (const step of steps.slice(2)) {
+			const d = computeDerived(step.state);
+			const isFlash = !d.isAuthenticated && !d.isLoading;
+			expect(isFlash, `Flash detected at "${step.label}"`).toBe(false);
+		}
+
+		// Final state should be authenticated
+		const final = computeDerived(steps[steps.length - 1].state);
+		expect(final.isAuthenticated).toBe(true);
+		expect(final.isLoading).toBe(false);
 	});
 });
