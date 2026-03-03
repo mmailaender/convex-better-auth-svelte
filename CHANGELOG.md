@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+### Patch Changes
+
+- fix: prevent SSR auth flash after sign-in client navigation by keeping client takeover latched after first settled session state.
+
 ## 0.5.2
 
 ### Patch Changes
