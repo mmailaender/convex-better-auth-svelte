@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1
+
+### Patch Changes
+
+- fix: allow token fetch during SSR hydration before session atom settles
+  - During initial hydration, `getSessionData()` returns `null` because the Better Auth session atom hasn't loaded yet. The old code skipped the token fetch in this case, causing the Convex client's synchronous `setAuth()` to receive no token — resulting in unauthenticated query subscriptions and a flash of `null` data overriding `initialData`.
+  - Track `sessionHasBeenAvailable` flag: only skip token fetches when the session was previously available and is now cleared (sign-out). During hydration, browser cookies are still valid for the token endpoint.
+
 ## 0.6.0
 
 ### Minor Changes
