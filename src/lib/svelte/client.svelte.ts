@@ -420,13 +420,27 @@ const makeFetchAccessTokenBrowser = (
 	getAuthOperationPending: () => boolean,
 	logVerbose: (message: string) => void
 ): FetchAccessToken => {
+	// Track whether the session atom has ever reported data.
+	// Before it has, we allow token fetches even though getSessionData()
+	// is null — the browser cookies are valid during initial hydration,
+	// and the null session simply means the atom hasn't settled yet.
+	// Once the session has been available and then clears (sign-out),
+	// we skip fetches to avoid 401s.
+	let sessionHasBeenAvailable = false;
+
 	return async ({ forceRefreshToken }) => {
 		if (!forceRefreshToken) return null;
 
-		// Skip the HTTP request entirely when the session is already cleared
-		// (e.g. after sign-out).  This prevents a 401 from the token endpoint
-		// when the Convex client's scheduled token refresh fires after sign-out.
-		if (!getSessionData()) {
+		const currentSession = getSessionData();
+		if (currentSession) {
+			sessionHasBeenAvailable = true;
+		}
+
+		// Skip the HTTP request when the session was previously available
+		// and is now cleared (e.g. after sign-out).  During initial hydration
+		// (sessionHasBeenAvailable === false), the cookies are still valid
+		// even though the session atom hasn't loaded yet.
+		if (sessionHasBeenAvailable && !currentSession) {
 			logVerbose('browser: session cleared, skipping token fetch');
 			return null;
 		}

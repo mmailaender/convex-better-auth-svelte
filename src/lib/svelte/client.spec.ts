@@ -71,6 +71,83 @@ describe('reactive getter: Better Auth session → ConvexAuthProvider mapping', 
 	});
 });
 
+describe('fetchAccessToken: SSR hydration — sessionHasBeenAvailable guard', () => {
+	// Mirrors the sessionHasBeenAvailable logic in makeFetchAccessTokenBrowser:
+	//
+	// During initial hydration, getSessionData() returns null because the
+	// Better Auth session atom hasn't settled yet.  The old code would bail
+	// with `return null` — causing the synchronous client.setAuth() call
+	// (from setupAuth) to report "no token" → unauthenticated subscriptions.
+	//
+	// The fix tracks whether the session has ever been available.  Only skip
+	// token fetches when the session was previously available and is now gone
+	// (sign-out).  During initial hydration, allow the fetch — browser cookies
+	// are still valid for the token endpoint.
+
+	function shouldSkipTokenFetch(
+		sessionHasBeenAvailable: boolean,
+		currentSession: unknown
+	): boolean {
+		return sessionHasBeenAvailable && !currentSession;
+	}
+
+	it('allows token fetch during initial hydration (session not yet loaded)', () => {
+		// Session atom hasn't settled — getSessionData() returns null.
+		// sessionHasBeenAvailable is false (never been available).
+		// Should NOT skip — cookies are valid, just need to fetch.
+		expect(shouldSkipTokenFetch(false, null)).toBe(false);
+	});
+
+	it('allows token fetch when session is available', () => {
+		// Session is loaded and available.
+		expect(shouldSkipTokenFetch(true, { user: { id: '1' } })).toBe(false);
+	});
+
+	it('skips token fetch after sign-out (session was available, now cleared)', () => {
+		// Session was previously available (sign-in happened),
+		// but is now null (sign-out completed).  Should skip to avoid 401.
+		expect(shouldSkipTokenFetch(true, null)).toBe(true);
+	});
+
+	it('tracks sessionHasBeenAvailable correctly through lifecycle', () => {
+		// Simulates the full lifecycle: hydration → session loads → sign-out
+		let sessionHasBeenAvailable = false;
+
+		const updateSessionAvailability = (session: unknown) => {
+			if (session) {
+				sessionHasBeenAvailable = true;
+			}
+		};
+
+		// 1. Hydration: session not loaded yet → should NOT skip
+		updateSessionAvailability(null);
+		expect(shouldSkipTokenFetch(sessionHasBeenAvailable, null)).toBe(false);
+
+		// 2. Session loads → should NOT skip (session is available)
+		const sessionData = { user: { id: '1' } };
+		updateSessionAvailability(sessionData);
+		expect(shouldSkipTokenFetch(sessionHasBeenAvailable, sessionData)).toBe(false);
+
+		// 3. Sign-out → should skip (session was available, now cleared)
+		updateSessionAvailability(null);
+		expect(shouldSkipTokenFetch(sessionHasBeenAvailable, null)).toBe(true);
+	});
+
+	it('sessionHasBeenAvailable stays true once set (never resets)', () => {
+		let sessionHasBeenAvailable = false;
+
+		// Session becomes available
+		sessionHasBeenAvailable = true;
+
+		// Even if session clears, the flag stays true
+		// (This prevents the guard from allowing fetches after sign-out)
+		expect(sessionHasBeenAvailable).toBe(true);
+
+		// Null session check
+		expect(shouldSkipTokenFetch(sessionHasBeenAvailable, null)).toBe(true);
+	});
+});
+
 describe('sign-in lifecycle: auth provider state transitions', () => {
 	it('produces correct ConvexAuthProvider sequence during sign-in', () => {
 		const steps: { label: string; session: BetterAuthSessionState }[] = [
