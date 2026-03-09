@@ -6,7 +6,7 @@
 	 * isAuthenticated=false/isLoading=false before auth settles.
 	 */
 	import { api } from '$convex/_generated/api.js';
-	import { useQuery } from 'convex-svelte';
+	import { useQuery } from '@mmailaender/convex-svelte';
 	import { useAuth } from '$lib/svelte/index.js';
 	import { authClient } from '$lib/auth-client.js';
 

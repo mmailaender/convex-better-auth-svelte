@@ -28,7 +28,6 @@
 				signInError = error.message ?? 'Sign in failed';
 				return;
 			}
-			// Client-side navigation — this is the key trigger for the bug
 			await goto('/test/client-nav/dashboard');
 		} catch (error) {
 			signInError = error instanceof Error ? error.message : 'Sign in failed';

@@ -4,11 +4,37 @@ trigger: always_on
 
 # Code Rules
 
-## General Guidelines
+## Priorities
 
-- Write clean, maintainable, and well-documented code
-- Prioritize Great architecture, DX and UX.
-- Stay consistent with the existing code.
-- Use TypeScript for all new code
-- Never use TypeScript type "any"
-- validate your implementation with "pnpm check 2>&1", "timeout 30 npx convex dev --once 2>&1 || true" and "pnpm format && pnpm lint". Fix all errors and warnings related to your code.
+1. Preserve and improve the existing architecture, DX, and UX.
+2. Stay consistent with the existing codebase and conventions.
+3. Keep changes minimal, focused, and easy to review.
+
+## Implementation
+
+- Write clean, maintainable, and well-documented code.
+- Use TypeScript for all new code.
+- Never use `any`.
+- Prefer existing patterns, utilities, and types over introducing new ones.
+- Do not refactor unrelated code unless it is necessary for the task.
+
+## Documentation
+
+If you add a feature or change the API, update:
+- `README.md`
+- `CHANGELOG.md`
+
+## Testing and Validation
+
+Ensure all new code is covered by tests.
+
+Before finishing, run:
+
+```bash
+pnpm test
+pnpm check 2>&1
+timeout 30 npx convex dev --once 2>&1 || true
+pnpm format && pnpm lint
+```
+
+Fix all errors and warnings related to your changes.
