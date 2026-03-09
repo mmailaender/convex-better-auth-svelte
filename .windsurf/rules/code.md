@@ -21,6 +21,7 @@ trigger: always_on
 ## Documentation
 
 If you add a feature or change the API, update:
+
 - `README.md`
 - `CHANGELOG.md`
 
