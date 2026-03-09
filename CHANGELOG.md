@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0
+
+### Minor Changes
+
+- feat: migrate to `@mmailaender/convex-svelte`
+  - switch peer dependency to `@mmailaender/convex-svelte`
+  - refactor to use primitives now provided by the extended Convex Svelte client
+  - move shared primitives out of this package into `@mmailaender/convex-svelte`
+  - keep `convex-better-auth-svelte` focused on Better Auth integration
+
+- chore: internal architecture cleanup
+
 ## 0.5.3
 
 ### Patch Changes

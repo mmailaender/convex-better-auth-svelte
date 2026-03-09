@@ -1,7 +1,7 @@
 {
 	"name": "@mmailaender/convex-better-auth-svelte",
 	"author": "Micha Mailaender",
-	"version": "0.5.3",
+	"version": "0.6.0",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -57,9 +57,9 @@
 	},
 	"peerDependencies": {
 		"@convex-dev/better-auth": ">=0.10.10",
+		"@mmailaender/convex-svelte": ">=0.15.0",
 		"better-auth": "^1.4.9",
 		"convex": "^1.31.0",
-		"convex-svelte": ">=0.0.12",
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {

@@ -131,6 +131,95 @@ test.describe('SSR Sign Out Flow', () => {
 		// Sign out button should be hidden
 		await expect(page.locator('[data-testid="sign-out-button"]')).not.toBeVisible();
 	});
+
+	test('no isLoading bounce during sign-out', async ({ page }) => {
+		await page.goto('/test/ssr');
+		await page.waitForLoadState('networkidle');
+
+		// Should be authenticated initially
+		await expect(page.locator('[data-testid="is-authenticated"]')).toContainText('true');
+		await page.waitForTimeout(500);
+
+		// Start monitoring isLoading state changes
+		await page.evaluate(() => {
+			(window as unknown as Record<string, unknown[]>).__isLoadingStates = [];
+			const observer = new MutationObserver(() => {
+				const el = document.querySelector('[data-testid="is-loading"]');
+				if (el) {
+					(window as unknown as Record<string, unknown[]>).__isLoadingStates.push({
+						value: el.textContent?.trim(),
+						timestamp: Date.now()
+					});
+				}
+			});
+			const target = document.querySelector('[data-testid="is-loading"]');
+			if (target) {
+				observer.observe(target, { childList: true, characterData: true, subtree: true });
+			}
+		});
+
+		// Click sign out
+		await page.locator('[data-testid="sign-out-button"]').click();
+
+		// Wait for unauthenticated state
+		await expect(page.locator('[data-testid="is-authenticated"]')).toContainText('false', {
+			timeout: 10000
+		});
+
+		// Give extra time for any trailing state changes
+		await page.waitForTimeout(500);
+
+		// Check that isLoading never bounced to true during sign-out
+		const states = await page.evaluate(
+			() => (window as unknown as Record<string, unknown[]>).__isLoadingStates
+		);
+		const loadingTrueStates = (states as { value: string; timestamp: number }[]).filter((s) =>
+			s.value.includes('true')
+		);
+
+		if (loadingTrueStates.length > 0) {
+			console.log('isLoading states during sign-out:', JSON.stringify(states, null, 2));
+		}
+		expect(loadingTrueStates).toHaveLength(0);
+	});
+
+	test('no 401 on token endpoint during sign-out', async ({ page }) => {
+		// Track all responses to the Convex token endpoint
+		const tokenResponses: { status: number; url: string }[] = [];
+		page.on('response', (response) => {
+			if (response.url().includes('/api/auth/convex/token')) {
+				tokenResponses.push({ status: response.status(), url: response.url() });
+			}
+		});
+
+		await page.goto('/test/ssr');
+		await page.waitForLoadState('networkidle');
+
+		// Should be authenticated initially
+		await expect(page.locator('[data-testid="is-authenticated"]')).toContainText('true');
+		await page.waitForTimeout(500);
+
+		// Clear the list — we only care about responses AFTER sign-out
+		tokenResponses.length = 0;
+
+		// Click sign out
+		await page.locator('[data-testid="sign-out-button"]').click();
+
+		// Wait for unauthenticated state to settle
+		await expect(page.locator('[data-testid="is-authenticated"]')).toContainText('false', {
+			timeout: 10000
+		});
+
+		// Give some extra time for any trailing token refresh requests
+		await page.waitForTimeout(1000);
+
+		// No 401s should have occurred on the token endpoint
+		const unauthorized = tokenResponses.filter((r) => r.status === 401);
+		if (unauthorized.length > 0) {
+			console.log('Token responses after sign-out:', JSON.stringify(tokenResponses, null, 2));
+		}
+		expect(unauthorized).toHaveLength(0);
+	});
 });
 
 test.describe('Client-only Authentication', () => {

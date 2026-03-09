@@ -1,8 +1,13 @@
 import { getContext, setContext, onMount } from 'svelte';
 
+import {
+	setupConvex,
+	setupAuth,
+	setConvexClientContext,
+	_authContextKey
+} from '@mmailaender/convex-svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
-
-import { setupConvex } from 'convex-svelte';
+import { beforeNavigate } from '$app/navigation';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
@@ -13,11 +18,6 @@ import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/cl
 /* -------------------------------------------------------------------------- */
 /*                                  Types                                     */
 /* -------------------------------------------------------------------------- */
-
-export type ConvexAuthClient = {
-	verbose?: boolean;
-	logger?: Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>;
-};
 
 type CrossDomainClient = ReturnType<typeof crossDomainClient>;
 type ConvexClientBetterAuth = ReturnType<typeof convexClient>;
@@ -51,11 +51,9 @@ type FetchAccessToken = (options: { forceRefreshToken: boolean }) => Promise<str
 // Context key for sharing auth client and functions
 const AUTH_CONTEXT_KEY = Symbol('auth-context');
 
-type AuthContext = {
+type BetterAuthContext = {
 	authClient: AuthClient;
 	fetchAccessToken: FetchAccessToken;
-	isLoading: boolean;
-	isAuthenticated: boolean;
 };
 
 type ExternalSession = {
@@ -213,21 +211,13 @@ const resolveConvexClient = (
 	convexUrl: string | undefined,
 	passedConvexClient: ConvexClient | undefined,
 	options?: ConvexClientOptions
-) => {
-	const url =
-		convexUrl ??
-		PUBLIC_CONVEX_URL ??
-		(() => {
-			throw new Error(
-				'No Convex URL provided. Either pass convexUrl parameter or set PUBLIC_CONVEX_URL environment variable.'
-			);
-		})();
-
-	let convexClient = passedConvexClient;
-	if (!convexClient) {
-		convexClient = setupConvexClient(url, { disabled: false, ...options });
+): void => {
+	if (passedConvexClient) {
+		setConvexClientContext(passedConvexClient);
+	} else {
+		const url = convexUrl ?? PUBLIC_CONVEX_URL;
+		setupConvex(url, { disabled: false, ...options });
 	}
-	return { url, convexClient };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -241,77 +231,112 @@ function createSvelteAuthClientBrowser({
 	options,
 	getServerState
 }: CreateSvelteAuthClientBaseArgs) {
-	// Get initial state from server if available
-	const serverState = getServerState?.();
-	const hasServerState = serverState !== undefined;
-	const hasServerAuth = serverState?.isAuthenticated === true;
+	// 1. Resolve Convex client (setupConvex / setConvexClientContext)
+	resolveConvexClient(convexUrl, passedConvexClient, options);
 
-	// Initialize state
+	// 2. Subscribe to Better Auth session state → reactive $state
 	let sessionData: SessionState['data'] | null = $state(null);
 	let sessionPending: boolean = $state(true);
-	let isConvexAuthenticated: boolean | null = $state(hasServerAuth ? true : null);
-	// Track whether we've ever had a definitive (non-pending) answer from the client.
-	// Once true it never reverts — this is the "client has taken over" latch.
-	let hasEverSettled = $state(false);
 
-	authClient.useSession().subscribe((session) => {
-		const wasAuthenticated = sessionData !== null;
-		sessionData = session.data;
-		sessionPending = session.isPending;
+	// Guard: during SvelteKit client-side navigation, the Better Auth session
+	// atom can briefly emit { data: null, isPending: false } before re-settling.
+	// setupAuth requires the not-authenticated transition to go through a loading
+	// phase first (isConvexAuthenticated: true → null → false).  This guard
+	// ensures that by temporarily reporting pending when a previously authenticated
+	// session suddenly becomes { null, false }.  A short timeout confirms the
+	// real state — navigation transients resolve well within 150ms, while real
+	// sign-outs proceed after the timeout fires.
+	let wasAuthenticated = false;
+	let transientGuardTimer: ReturnType<typeof setTimeout> | null = null;
 
-		// Track when we first get a definitive answer
-		if (!session.isPending) {
-			hasEverSettled = true;
-		}
+	// Bridge the gap between auth operations and session atom updates.
+	// Better Auth uses a 10ms setTimeout before toggling $sessionSignal
+	// (see proxy.mjs), which means the session atom doesn't start refetching
+	// until ~10ms after signIn/signUp completes.  During this gap, goto()
+	// can navigate to a new page with stale auth state, causing a flash of
+	// unauthenticated content.  We set sessionPending=true during navigation
+	// when the session is not yet established, giving the atom time to settle.
+	let navigationPendingTimer: ReturnType<typeof setTimeout> | null = null;
 
-		// If session state changed from authenticated to unauthenticated, reset Convex auth
-		const isNowAuthenticated = sessionData !== null;
-		if (wasAuthenticated && !isNowAuthenticated) {
-			isConvexAuthenticated = false;
-		}
-		// If we went back to loading state, reset Convex auth to null
-		// But only after we've settled once (not during initial hydration with server auth)
-		if (session.isPending && isConvexAuthenticated !== null && hasEverSettled) {
-			isConvexAuthenticated = null;
+	beforeNavigate(({ willUnload }) => {
+		if (!willUnload && !sessionData) {
+			sessionPending = true;
+			if (navigationPendingTimer) clearTimeout(navigationPendingTimer);
+			navigationPendingTimer = setTimeout(() => {
+				navigationPendingTimer = null;
+				sessionPending = false;
+			}, 50);
 		}
 	});
 
-	const isAuthProviderAuthenticated = $derived(sessionData !== null);
+	// Prevent stale token fetches during sign-out (and other auth operations).
+	// Better Auth's proxy toggles $sessionSignal via setTimeout(10ms) after an
+	// auth request succeeds.  Between the cookie being cleared (sign-out response)
+	// and the session atom settling with null data, the Convex client's scheduled
+	// token refresh can fire and hit the token endpoint → 401.
+	// We set this flag when the signal fires while we have an active session, and
+	// clear it once the session atom finishes refetching.  fetchAccessToken skips
+	// the HTTP request while this flag is true.
+	let authOperationPending = false;
+	let signalInitialized = false;
 
-	// Client takes over once we've received a definitive (non-pending) answer.
-	// hasEverSettled is a one-way latch: once the client has settled, we never
-	// fall back to (potentially stale) server state, even if the session goes
-	// pending again (e.g. after sign-in → goto).
-	const clientHasTakenOver = $derived(hasEverSettled);
+	authClient.$store.listen('$sessionSignal', () => {
+		if (!signalInitialized) {
+			signalInitialized = true;
+			return;
+		}
+		if (sessionData) {
+			authOperationPending = true;
+		}
+	});
 
-	const isAuthenticated = $derived(
-		clientHasTakenOver
-			? isAuthProviderAuthenticated && (isConvexAuthenticated ?? false)
-			: hasServerAuth // Trust server state during initial hydration
-	);
+	authClient.useSession().subscribe((session: SessionState) => {
+		if (navigationPendingTimer) {
+			clearTimeout(navigationPendingTimer);
+			navigationPendingTimer = null;
+		}
 
-	// Loading state:
-	// - Before client data: loading unless we have server state (authenticated OR unauthenticated)
-	// - After client data: loading if session pending OR waiting for Convex confirmation
-	const isLoading = $derived(
-		clientHasTakenOver
-			? sessionPending || (isAuthProviderAuthenticated && isConvexAuthenticated === null)
-			: !hasServerState // Loading only if no server state at all
-	);
+		// Detect whether a known auth operation (sign-out, etc.) is settling.
+		// We must capture this BEFORE clearing the flag, so the transient guard
+		// below can distinguish a real sign-out from a transient navigation glitch.
+		const isRefetching = (session as Record<string, unknown>).isRefetching as boolean;
+		const isAuthOpSettling = authOperationPending && !isRefetching;
+		if (isAuthOpSettling) {
+			authOperationPending = false;
+		}
 
-	// Whether the Convex client should have auth set.
-	// During hydration: trust server auth OR Better Auth session.
-	// After client settles: only trust Better Auth session, so that
-	// sign-out properly reaches clearAuth() even when the page was
-	// originally loaded while signed in (hasServerAuth would be stale).
-	// IMPORTANT: this MUST be a $derived (memoized) so the $effect below
-	// only re-runs when the boolean result actually changes — not when
-	// intermediate inputs like clientHasTakenOver transition.
-	const shouldSetAuth = $derived(
-		clientHasTakenOver ? isAuthProviderAuthenticated : hasServerAuth || isAuthProviderAuthenticated
-	);
+		if (transientGuardTimer) {
+			clearTimeout(transientGuardTimer);
+			transientGuardTimer = null;
+		}
 
-	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
+		if (session.data) {
+			wasAuthenticated = true;
+		}
+
+		if (wasAuthenticated && !session.data && !session.isPending) {
+			sessionData = null;
+
+			if (isAuthOpSettling) {
+				// Known auth operation (e.g. sign-out) — the null session is real.
+				// Skip the transient guard to avoid an isLoading flicker.
+				sessionPending = false;
+				wasAuthenticated = false;
+			} else {
+				// Unknown origin — could be a transient glitch during navigation.
+				// Guard by temporarily reporting loading, then clear after 150ms.
+				sessionPending = true;
+				transientGuardTimer = setTimeout(() => {
+					transientGuardTimer = null;
+					sessionPending = false;
+				}, 150);
+			}
+			return;
+		}
+
+		sessionData = session.data;
+		sessionPending = session.isPending;
+	});
 
 	const logVerbose = (message: string) => {
 		if (options?.verbose) {
@@ -319,51 +344,30 @@ function createSvelteAuthClientBrowser({
 		}
 	};
 
-	const fetchAccessToken = makeFetchAccessTokenBrowser(authClient, logVerbose);
+	const fetchAccessToken = makeFetchAccessTokenBrowser(
+		authClient,
+		() => sessionData,
+		() => authOperationPending,
+		logVerbose
+	);
 
-	// Call the one-time token handler
+	// 3. Delegate entire auth state machine to setupAuth
+	const serverState = getServerState?.();
+	setupAuth(
+		() => ({
+			isLoading: sessionPending,
+			isAuthenticated: !!sessionData,
+			fetchAccessToken
+		}),
+		serverState ? { initialState: { isAuthenticated: serverState.isAuthenticated } } : undefined
+	);
+
+	// 4. Set additional context for our enhanced useAuth (fetchAccessToken)
+	setContext<BetterAuthContext>(AUTH_CONTEXT_KEY, { authClient, fetchAccessToken });
+
+	// 5. Handle one-time token verification
 	onMount(() => {
 		handleOneTimeToken(authClient);
-	});
-
-	// Effect to handle Convex backend confirmation
-	$effect(() => {
-		let effectRelevant = true;
-
-		if (shouldSetAuth) {
-			// Set auth with callback to receive backend confirmation
-			convexClient.setAuth(fetchAccessToken, (backendReportsIsAuthenticated: boolean) => {
-				if (effectRelevant) {
-					isConvexAuthenticated = backendReportsIsAuthenticated;
-				}
-			});
-
-			// Cleanup function
-			return () => {
-				effectRelevant = false;
-				// If unmounting or something changed before we finished fetching the token
-				// we shouldn't transition to a loaded state.
-				isConvexAuthenticated = isConvexAuthenticated ? false : null;
-			};
-		} else {
-			// Clear auth when not authenticated
-			convexClient.client.clearAuth();
-			return () => {
-				isConvexAuthenticated = null;
-			};
-		}
-	});
-
-	// Set context to make auth state available to useAuth
-	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
-		authClient,
-		fetchAccessToken,
-		get isLoading() {
-			return isLoading;
-		},
-		get isAuthenticated() {
-			return isAuthenticated;
-		}
 	});
 }
 
@@ -383,11 +387,8 @@ function createSvelteAuthClientExternal({
 	options,
 	externalSession
 }: CreateSvelteAuthClientExternalArgs) {
-	let isConvexAuthenticated: boolean | null = $state(null);
-	const isAuthenticated = $derived(isConvexAuthenticated ?? false);
-	const isLoading = $derived(isConvexAuthenticated === null);
-
-	const { convexClient } = resolveConvexClient(convexUrl, passedConvexClient, options);
+	// 1. Resolve Convex client
+	resolveConvexClient(convexUrl, passedConvexClient, options);
 
 	const logVerbose = (message: string) => {
 		if (options?.verbose) {
@@ -397,36 +398,16 @@ function createSvelteAuthClientExternal({
 
 	const fetchAccessToken = makeFetchAccessTokenExternal(authClient, externalSession, logVerbose);
 
-	$effect(() => {
-		let effectRelevant = true;
+	// 2. Delegate auth state machine to setupAuth.
+	//    For external flow: always attempt authentication, let backend confirm.
+	setupAuth(() => ({
+		isLoading: false,
+		isAuthenticated: true,
+		fetchAccessToken
+	}));
 
-		convexClient.setAuth(
-			// Convex still calls this as fetchAccessToken({ forceRefreshToken })
-			// so we keep the signature and ignore the parameter here.
-			(options) => fetchAccessToken(options),
-			(backendReportsIsAuthenticated: boolean) => {
-				if (effectRelevant) {
-					isConvexAuthenticated = backendReportsIsAuthenticated;
-				}
-			}
-		);
-
-		return () => {
-			effectRelevant = false;
-			isConvexAuthenticated = isConvexAuthenticated ? false : null;
-		};
-	});
-
-	setContext<AuthContext>(AUTH_CONTEXT_KEY, {
-		authClient,
-		fetchAccessToken,
-		get isLoading() {
-			return isLoading;
-		},
-		get isAuthenticated() {
-			return isAuthenticated;
-		}
-	});
+	// 3. Set additional context for our enhanced useAuth (fetchAccessToken)
+	setContext<BetterAuthContext>(AUTH_CONTEXT_KEY, { authClient, fetchAccessToken });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -435,10 +416,28 @@ function createSvelteAuthClientExternal({
 
 const makeFetchAccessTokenBrowser = (
 	authClient: AuthClient,
+	getSessionData: () => SessionState['data'] | null,
+	getAuthOperationPending: () => boolean,
 	logVerbose: (message: string) => void
 ): FetchAccessToken => {
 	return async ({ forceRefreshToken }) => {
 		if (!forceRefreshToken) return null;
+
+		// Skip the HTTP request entirely when the session is already cleared
+		// (e.g. after sign-out).  This prevents a 401 from the token endpoint
+		// when the Convex client's scheduled token refresh fires after sign-out.
+		if (!getSessionData()) {
+			logVerbose('browser: session cleared, skipping token fetch');
+			return null;
+		}
+
+		// Skip while a session-affecting operation (sign-out, update-user, etc.)
+		// is in progress.  The session cookie may already be cleared on the server
+		// but the session atom hasn't settled yet — fetching a token now would 401.
+		if (getAuthOperationPending()) {
+			logVerbose('browser: auth operation pending, skipping token fetch');
+			return null;
+		}
 
 		const token = await fetchTokenBrowser(authClient, logVerbose);
 		logVerbose('browser: returning retrieved token');
@@ -477,50 +476,6 @@ const makeFetchAccessTokenExternal = (
 };
 
 /* -------------------------------------------------------------------------- */
-/*                          Convex client helper                              */
-/* -------------------------------------------------------------------------- */
-
-const setupConvexClient = (convexUrl: string, options?: ConvexClientOptions) => {
-	// Client resolution priority:
-	// 1. Client from context
-	// 2. Try to create one if setupConvex is available
-
-	let client: ConvexClient | null = null;
-
-	// Try to get client from context
-	try {
-		client = getContext('$$_convexClient');
-	} catch {
-		// Context not available or no client in context
-	}
-
-	// If no client and convexUrl is provided, try to create one using setupConvex
-	if (!client) {
-		try {
-			setupConvex(convexUrl, options);
-			// Try to get the client from context again after setup
-			try {
-				client = getContext('$$_convexClient');
-			} catch {
-				// Context still not available - setupConvex may not have set context properly
-				console.warn('setupConvex completed but client not available in context');
-			}
-		} catch (e) {
-			console.warn('Failed to setup Convex client:', e);
-		}
-	}
-
-	// If we still don't have a client, throw an error
-	if (!client) {
-		throw new Error(
-			'No ConvexClient was provided. Either pass one to createSvelteAuthClient or call setupConvex() first.'
-		);
-	}
-
-	return client;
-};
-
-/* -------------------------------------------------------------------------- */
 /*                          Token helpers                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -546,7 +501,10 @@ const fetchTokenBrowser = async (
 			return data?.token || null;
 		} catch (e) {
 			if (!isNetworkError(e)) {
-				throw e;
+				// Non-network errors (e.g. 401/403 after session expiry) mean
+				// the session is gone — return null instead of throwing.
+				logVerbose(`fetchToken failed with non-network error: ${e}`);
+				return null;
 			}
 			if (retries > 10) {
 				logVerbose(`fetchToken failed with network error, giving up`);
@@ -591,18 +549,27 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 /*                               useAuth hook                                 */
 /* -------------------------------------------------------------------------- */
 
+// _authContextKey is imported from @mmailaender/convex-svelte (set by setupAuth)
+
 /**
- * Hook to access authentication state and functions
- * Must be used within a component that has createSvelteAuthClient called in its parent tree
+ * Hook to access authentication state and functions.
+ * Must be used within a component that has createSvelteAuthClient called in its parent tree.
+ *
+ * Returns a superset of `useAuth()` from `@mmailaender/convex-svelte`:
+ * - `isLoading` / `isAuthenticated` — from the base library's setupAuth context
+ * - `fetchAccessToken` — Better Auth-specific, for manually fetching a Convex JWT
  */
 export const useAuth = (): {
 	isLoading: boolean;
 	isAuthenticated: boolean;
 	fetchAccessToken: FetchAccessToken;
 } => {
-	const authContext = getContext<AuthContext>(AUTH_CONTEXT_KEY);
+	const baseAuthContext = getContext<{ isLoading: boolean; isAuthenticated: boolean } | undefined>(
+		_authContextKey
+	);
+	const betterAuthContext = getContext<BetterAuthContext | undefined>(AUTH_CONTEXT_KEY);
 
-	if (!authContext) {
+	if (!baseAuthContext || !betterAuthContext) {
 		throw new Error(
 			'useAuth must be used within a component that has createSvelteAuthClient called in its parent tree'
 		);
@@ -610,11 +577,11 @@ export const useAuth = (): {
 
 	return {
 		get isLoading() {
-			return authContext.isLoading;
+			return baseAuthContext.isLoading;
 		},
 		get isAuthenticated() {
-			return authContext.isAuthenticated;
+			return baseAuthContext.isAuthenticated;
 		},
-		fetchAccessToken: authContext.fetchAccessToken
+		fetchAccessToken: betterAuthContext.fetchAccessToken
 	};
 };
