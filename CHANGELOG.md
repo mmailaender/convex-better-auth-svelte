@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2
+
+### Patch Changes
+
+- fix: resolve auth cookie behind reverse proxy when cookie name prefix differs (`__Secure-` vs non-secure)
+  - `getToken` now returns the alternative cookie variant when the primary lookup fails, instead of only logging a warning. This fixes SSR treating users as unauthenticated when the app runs behind a reverse proxy where the external URL (HTTPS) differs from the internal origin.
+  - Follows the same fallback pattern used by Better Auth's own `getSessionCookie`.
+
 ## 0.6.1
 
 ### Patch Changes
