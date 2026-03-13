@@ -16,7 +16,86 @@ vi.mock('convex/browser', () => ({
 	ConvexHttpClient: vi.fn()
 }));
 
-import { createSvelteKitHandler } from './index.js';
+import { createCookieGetter } from 'better-auth/cookies';
+import { createSvelteKitHandler, getToken } from './index.js';
+
+const mockCreateCookieGetter = vi.mocked(createCookieGetter);
+
+const mockCreateAuth = (() => ({ options: {} })) as unknown as Parameters<typeof getToken>[0];
+
+const mockCookies = (map: Record<string, string>): Parameters<typeof getToken>[1] =>
+	({ get: (name: string) => map[name] }) as Parameters<typeof getToken>[1];
+
+describe('getToken', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('returns the token when primary cookie name matches', async () => {
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+
+		const token = await getToken(
+			mockCreateAuth,
+			mockCookies({ 'better-auth.convex_jwt': 'my-token' })
+		);
+		expect(token).toBe('my-token');
+	});
+
+	it('returns insecure fallback when expected secure cookie is missing', async () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: '__Secure-better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+
+		const token = await getToken(
+			mockCreateAuth,
+			mockCookies({ 'better-auth.convex_jwt': 'insecure-token' })
+		);
+
+		expect(token).toBe('insecure-token');
+		expect(warnSpy).toHaveBeenCalledOnce();
+		expect(warnSpy.mock.calls[0]?.[0]).toContain('reverse proxy');
+	});
+
+	it('returns secure fallback when expected insecure cookie is missing', async () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+
+		const token = await getToken(
+			mockCreateAuth,
+			mockCookies({ '__Secure-better-auth.convex_jwt': 'secure-token' })
+		);
+
+		expect(token).toBe('secure-token');
+		expect(warnSpy).toHaveBeenCalledOnce();
+		expect(warnSpy.mock.calls[0]?.[0]).toContain('reverse proxy');
+	});
+
+	it('returns undefined when neither cookie variant exists', async () => {
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+
+		const token = await getToken(mockCreateAuth, mockCookies({}));
+		expect(token).toBeUndefined();
+	});
+});
 
 describe('createSvelteKitHandler', () => {
 	let capturedRequest: Request | undefined;

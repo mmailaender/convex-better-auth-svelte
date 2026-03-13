@@ -30,7 +30,7 @@
 		"setup:test-user": "npx tsx scripts/setup-test-user.ts",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
-		"release": "changeset publish"
+		"release": "changeset publish && git push --follow-tags"
 	},
 	"files": [
 		"dist/svelte",

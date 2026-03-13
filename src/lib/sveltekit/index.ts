@@ -34,15 +34,19 @@ export const getToken = async <DataModel extends GenericDataModel>(
 		// If we expected secure and found insecure set
 		if (isSecure && insecureValue) {
 			console.warn(
-				`Looking for secure cookie "${cookie.name}" but found insecure cookie "${insecureCookieName}".`
+				`Looking for secure cookie "${cookie.name}" but found insecure cookie "${insecureCookieName}". ` +
+					`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
 			);
+			return insecureValue;
 		}
 
 		// If we expected insecure and found secure set
 		if (!isSecure && secureValue) {
 			console.warn(
-				`Looking for insecure cookie "${cookie.name}" but found secure cookie "${secureCookieName}".`
+				`Looking for insecure cookie "${cookie.name}" but found secure cookie "${secureCookieName}". ` +
+					`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
 			);
+			return secureValue;
 		}
 	}
 
