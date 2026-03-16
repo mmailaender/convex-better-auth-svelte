@@ -5,6 +5,7 @@ import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
 import type { GenericDataModel } from 'convex/server';
+import { _getServerToken } from '@mmailaender/convex-svelte/sveltekit';
 
 /**
  * Initial auth state that can be passed from server to client.
@@ -54,46 +55,74 @@ export const getToken = async <DataModel extends GenericDataModel>(
 };
 
 /**
- * Get initial auth state from cookies for SSR.
+ * Get initial auth state for SSR.
  *
- * This checks for the presence of the JWT cookie to determine if the user
- * is likely authenticated. Note: This does NOT validate the token with the
- * Convex backend - it only checks cookie presence. The client-side auth
- * flow will still validate the token after hydration.
+ * When `withServerConvexToken` is set up in `hooks.server.ts`, call with
+ * **no arguments** — the token is read automatically from the request context:
  *
  * @example
  * ```ts
- * // +layout.server.ts
+ * // +layout.server.ts (recommended — requires withServerConvexToken in hooks.server.ts)
+ * import { getAuthState } from '@mmailaender/convex-better-auth-svelte/sveltekit';
+ *
+ * export const load = async () => ({
+ *   authState: getAuthState()
+ * });
+ * ```
+ *
+ * For backward compatibility, you can still pass `createAuth` and `cookies`
+ * explicitly. This is useful if you don't use `withServerConvexToken`:
+ *
+ * @example
+ * ```ts
+ * // +layout.server.ts (legacy)
  * import { getAuthState } from '@mmailaender/convex-better-auth-svelte/sveltekit';
  * import { createAuth } from '../convex/auth';
  *
- * export const load = async ({ cookies }) => {
- *   return {
- *     authState: await getAuthState(createAuth, cookies)
- *   };
- * };
+ * export const load = async ({ cookies }) => ({
+ *   authState: await getAuthState(createAuth, cookies)
+ * });
  * ```
  */
-export const getAuthState = async <DataModel extends GenericDataModel>(
+export function getAuthState(): InitialAuthState;
+export function getAuthState<DataModel extends GenericDataModel>(
 	createAuth: CreateAuth<DataModel>,
 	cookies: Cookies
-): Promise<InitialAuthState> => {
-	const token = await getToken(createAuth, cookies);
-	return {
-		isAuthenticated: !!token
-	};
-};
+): Promise<InitialAuthState>;
+export function getAuthState<DataModel extends GenericDataModel>(
+	createAuth?: CreateAuth<DataModel>,
+	cookies?: Cookies
+): InitialAuthState | Promise<InitialAuthState> {
+	// 1. Try AsyncLocalStorage (zero-cost when withServerConvexToken is active)
+	const serverToken = _getServerToken();
+	if (serverToken !== undefined) {
+		return { isAuthenticated: true };
+	}
 
-export const createConvexHttpClient = (args: {
-	token?: string;
-	convexUrl?: string;
-	options?: {
-		skipConvexDeploymentUrlCheck?: boolean;
-		logger?: ConvexClientOptions['logger'];
-	};
-}) => {
+	// 2. Fall back to cookie-based approach (backward compat)
+	if (createAuth && cookies) {
+		return getToken(createAuth, cookies).then((token) => ({
+			isAuthenticated: !!token
+		}));
+	}
+
+	// 3. No token context and no cookies — unauthenticated
+	return { isAuthenticated: false };
+}
+
+export const createConvexHttpClient = (
+	args: {
+		token?: string;
+		convexUrl?: string;
+		options?: {
+			skipConvexDeploymentUrlCheck?: boolean;
+			logger?: ConvexClientOptions['logger'];
+		};
+	} = {}
+) => {
 	const client = new ConvexHttpClient(args.convexUrl ?? PUBLIC_CONVEX_URL, args.options);
-	if (args.token) client.setAuth(args.token);
+	const token = args.token ?? _getServerToken();
+	if (token) client.setAuth(token);
 	return client;
 };
 
