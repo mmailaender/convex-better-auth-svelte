@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.7.0
+
+### Minor Changes
+
+- feat: `getAuthState()` auto-reads token from `withServerConvexToken` context
+
+  When `withServerConvexToken` is set up in `hooks.server.ts`, `getAuthState()` can now be called **with no arguments** — the token is read automatically from `AsyncLocalStorage`. This eliminates the redundant `getToken()` call and removes the need to pass `createAuth` and `cookies`:
+
+  ```ts
+  // Before (still supported)
+  const authState = await getAuthState(createAuth, cookies);
+
+  // After (recommended)
+  const authState = getAuthState(); // synchronous, no await needed
+  ```
+
+  The old signature `getAuthState(createAuth, cookies)` is preserved for backward compatibility.
+
+- feat: `createConvexHttpClient()` auto-reads token from `withServerConvexToken` context
+
+  The `args` parameter is now optional. When no explicit `token` is provided, the client reads from `AsyncLocalStorage`:
+
+  ```ts
+  // Before
+  const client = createConvexHttpClient({ token: locals.token });
+
+  // After (recommended)
+  const client = createConvexHttpClient();
+  ```
+
 ## 0.6.2
 
 ### Patch Changes
