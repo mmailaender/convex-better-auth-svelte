@@ -34,9 +34,9 @@ These two packages have a clear layered relationship. **convex-svelte** is the f
 
 - **`createSvelteAuthClient`** — subscribes to Better Auth's `useSession()` atom and maps it to the `ConvexAuthProvider` shape that `setupAuth` expects. Supports browser flow (cookies) and external session flow (device auth, API keys, CLIs).
 - **Transient guard (150ms)** — intercepts the `{ data: null, isPending: false }` state that Better Auth's session atom emits transiently during SvelteKit client-side navigation. Reports `isPending: true` temporarily so that `setupAuth`'s loading reset fires instead of an immediate `false` (which would cause a flash).
-- **`authOperationPending` / `isAuthOpSettling`** — listens to Better Auth's `$sessionSignal` to detect when an auth operation (sign-out, etc.) is in progress. Prevents stale token fetches (401) and skips the transient guard for known auth operations (prevents `isLoading` bounce on sign-out).
+- **`authOperationPending` / `isAuthOpSettling`** — listens to Better Auth's `$sessionSignal` to detect when an auth operation (sign-out, etc.) or tab-refocus refetch is in progress. Used for: (a) skipping the transient guard for known auth operations (prevents `isLoading` bounce on sign-out), and (b) making `fetchAccessToken` await settling before deciding (prevents both 401 on sign-out and auth flash on tab refocus).
 - **`beforeNavigate` bridge (50ms)** — bridges the 10ms gap between `signIn()` completing and Better Auth's `$sessionSignal` firing (delayed by `setTimeout(10ms)` in proxy.mjs). Sets `sessionPending = true` during client-side navigation when `sessionData` is null, preventing a flash of unauthenticated content.
-- **`fetchAccessToken`** — calls `authClient.convex.token()` to obtain a Convex JWT. Skips the HTTP request when the session is cleared or an auth operation is pending, preventing 401s on the token endpoint.
+- **`fetchAccessToken`** — calls `authClient.convex.token()` to obtain a Convex JWT. Skips the HTTP request when the session was previously available and is now cleared (`sessionHasBeenAvailable && !currentSession`). When `authOperationPending` is true, awaits the settling promise then re-checks the session: survived → proceed (tab refocus), cleared → skip (sign-out, no 401).
 - **`useAuth`** — reads both convex-svelte's auth context (`isLoading`, `isAuthenticated`) and the Better Auth context (`fetchAccessToken`).
 - **`getAuthState` / `getServerState`** — SvelteKit server-side helpers that read Better Auth session from cookies for SSR `initialState`.
 - **`createSvelteKitHandler`** — proxies Better Auth API requests to the Convex site URL.
@@ -53,7 +53,7 @@ These two packages have a clear layered relationship. **convex-svelte** is the f
 | Stale detection (provider changed, no effect) | ✅ in `isLoading` getter | —                                       |
 | Session atom subscription                     | —                        | ✅ `createSvelteAuthClientBrowser`      |
 | Transient guard (flash prevention)            | —                        | ✅ in session subscription              |
-| Auth operation tracking (401 / bounce)        | —                        | ✅ `$store.listen` + `isAuthOpSettling` |
+| Auth operation tracking (bounce + 401 + flash) | —                        | ✅ `$store.listen` + `isAuthOpSettling` |
 | Navigation bridge (sign-in gap)               | —                        | ✅ `beforeNavigate` + 50ms timer        |
 | `fetchAccessToken`                            | generic parameter        | ✅ `authClient.convex.token()`          |
 | SSR state from cookies                        | generic `initialState`   | ✅ `getAuthState` / `getServerState`    |
@@ -67,7 +67,7 @@ Three distinct mechanisms protect against Better Auth's async timing quirks:
 
 1. **Transient guard (150ms)** — Better Auth's session atom briefly emits `{ data: null, isPending: false }` during client-side navigation before re-settling. The guard temporarily reports `sessionPending = true`, giving `setupAuth` a loading phase instead of a flash to unauthenticated. Skipped for known auth operations via `isAuthOpSettling`.
 
-2. **`authOperationPending` + `isAuthOpSettling`** — `$store.listen('$sessionSignal')` detects when an auth-affecting request (sign-out, update-user) completes. The flag is set when the signal fires while authenticated, and cleared when the session atom finishes refetching (`isRefetching = false`). Prevents: (a) stale token fetches → 401, (b) transient guard firing on sign-out → `isLoading` bounce.
+2. **`authOperationPending` + `isAuthOpSettling`** — `$store.listen('$sessionSignal')` detects when `$sessionSignal` fires while authenticated. The flag is set and a settling promise is created. Cleared when the session atom finishes refetching (`isRefetching = false`), resolving the promise. Used for: (a) skipping the transient guard on sign-out (prevents `isLoading` bounce), and (b) making `fetchAccessToken` **await** settling before deciding. After settling, `fetchAccessToken` re-checks the session: still valid → proceed (tab refocus), cleared → skip (sign-out, no 401). This avoids both the auth flash on tab refocus (caused by immediate skip) and the 401 on sign-out (caused by no skip).
 
 3. **`beforeNavigate` bridge (50ms)** — Better Auth's proxy toggles `$sessionSignal` via `setTimeout(10ms)` after `signIn()` completes. During this 10ms gap, `goto()` can navigate to a new page with stale `sessionData = null`. The bridge sets `sessionPending = true` during navigation when no session exists, giving the atom time to settle.
 

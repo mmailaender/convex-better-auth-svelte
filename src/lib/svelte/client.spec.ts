@@ -148,6 +148,183 @@ describe('fetchAccessToken: SSR hydration — sessionHasBeenAvailable guard', ()
 	});
 });
 
+describe('fetchAccessToken: tab refocus must not cause auth flash', () => {
+	// This test mirrors the ACTUAL skip logic in makeFetchAccessTokenBrowser
+	// and asserts the DESIRED behavior.
+	//
+	// On tab refocus, Better Auth's session-refresh manager toggles
+	// $sessionSignal to trigger a session revalidation.  This is the SAME
+	// signal that proxy.mjs toggles after auth operations (sign-out, etc.).
+	// Our $store.listen('$sessionSignal') handler sets authOperationPending
+	// when the signal fires while sessionData is present.
+	//
+	// If fetchAccessToken blocks (returns null) when authOperationPending
+	// is true, the Convex AuthenticationManager calls onChange(false) →
+	// isConvexAuthenticated = false → { isLoading: false, isAuthenticated: false }
+	// → redirect to login page.  This is the bug we are reproducing.
+
+	/**
+	 * Mirrors the skip logic in makeFetchAccessTokenBrowser EXACTLY.
+	 * Returns true when the function would return null (skip the fetch).
+	 *
+	 * When authOperationPending is true, the real code awaits a settling
+	 * promise, then re-checks the session.  We simulate this by accepting
+	 * `sessionAfterSettle` — the session state AFTER the auth op settled.
+	 */
+	function wouldSkipTokenFetch(
+		sessionHasBeenAvailable: boolean,
+		currentSession: unknown,
+		authOperationPending: boolean,
+		sessionAfterSettle?: unknown
+	): boolean {
+		if (sessionHasBeenAvailable && !currentSession) return true;
+		if (authOperationPending) {
+			// Await settling, then re-check session
+			const settled = sessionAfterSettle !== undefined ? sessionAfterSettle : currentSession;
+			if (sessionHasBeenAvailable && !settled) return true;
+			return false;
+		}
+		return false;
+	}
+
+	it('must NOT skip token fetch on tab refocus (session valid, authOperationPending true)', () => {
+		// Tab refocus scenario:
+		// 1. User is authenticated, session data present
+		// 2. Tab becomes visible → session-refresh.mjs toggles $sessionSignal
+		// 3. Our $store.listen handler sets authOperationPending = true
+		// 4. Convex client's WebSocket reconnects, calls fetchAccessToken
+		// 5. fetchAccessToken waits for settling → session still valid → proceed
+		const skip = wouldSkipTokenFetch(
+			true, // sessionHasBeenAvailable
+			{ user: { id: '1' } }, // currentSession — still valid
+			true, // authOperationPending — set by $sessionSignal
+			{ user: { id: '1' } } // sessionAfterSettle — still valid (tab refocus)
+		);
+		expect(skip).toBe(false);
+	});
+
+	it('must skip token fetch after sign-out (session cleared after settling)', () => {
+		// Sign-out: authOperationPending true, session valid at first,
+		// but after awaiting settle the session is null.
+		const skip = wouldSkipTokenFetch(
+			true, // sessionHasBeenAvailable
+			{ user: { id: '1' } }, // currentSession — still valid during the window
+			true, // authOperationPending
+			null // sessionAfterSettle — session cleared (sign-out)
+		);
+		expect(skip).toBe(true);
+	});
+
+	it('must skip token fetch when session already cleared', () => {
+		// After sign-out: session atom settled with null, no pending op.
+		expect(wouldSkipTokenFetch(true, null, false)).toBe(true);
+	});
+
+	it('must allow token fetch during initial hydration', () => {
+		expect(wouldSkipTokenFetch(false, null, false)).toBe(false);
+	});
+});
+
+describe('transient guard: $sessionSignal on tab refocus vs sign-out', () => {
+	// Better Auth's $sessionSignal is shared between:
+	// 1. Auth operations (sign-out via proxy.mjs onSuccess → 10ms timeout)
+	// 2. Session refresh (tab refocus via session-refresh.mjs triggerRefetch)
+	//
+	// The transient guard + isAuthOpSettling logic must handle both correctly.
+
+	interface SubscriptionState {
+		sessionData: unknown;
+		sessionPending: boolean;
+		wasAuthenticated: boolean;
+		authOperationPending: boolean;
+	}
+
+	function processSessionEmission(
+		state: SubscriptionState,
+		session: { data: unknown; isPending: boolean; isRefetching: boolean }
+	): SubscriptionState {
+		const isAuthOpSettling = state.authOperationPending && !session.isRefetching;
+		const newState = { ...state };
+		if (isAuthOpSettling) {
+			newState.authOperationPending = false;
+		}
+		if (session.data) {
+			newState.wasAuthenticated = true;
+		}
+		if (state.wasAuthenticated && !session.data && !session.isPending) {
+			newState.sessionData = null;
+			if (isAuthOpSettling) {
+				newState.sessionPending = false;
+				newState.wasAuthenticated = false;
+			} else {
+				newState.sessionPending = true; // transient guard active
+			}
+			return newState;
+		}
+		newState.sessionData = session.data;
+		newState.sessionPending = session.isPending;
+		return newState;
+	}
+
+	it('tab refocus: session stays valid, no state change', () => {
+		// Tab refocus → $sessionSignal toggles → authOperationPending = true
+		let state: SubscriptionState = {
+			sessionData: { user: { id: '1' } },
+			sessionPending: false,
+			wasAuthenticated: true,
+			authOperationPending: true // set by $sessionSignal listener
+		};
+
+		// onRequest: data stays, isRefetching = true
+		state = processSessionEmission(state, {
+			data: { user: { id: '1' } },
+			isPending: false,
+			isRefetching: true
+		});
+		expect(state.sessionData).toEqual({ user: { id: '1' } });
+		expect(state.sessionPending).toBe(false);
+		expect(state.authOperationPending).toBe(true); // not cleared yet
+
+		// onSuccess: fresh data, isRefetching = false
+		state = processSessionEmission(state, {
+			data: { user: { id: '1' } },
+			isPending: false,
+			isRefetching: false
+		});
+		expect(state.sessionData).toEqual({ user: { id: '1' } });
+		expect(state.sessionPending).toBe(false);
+		expect(state.authOperationPending).toBe(false); // cleared
+		// Provider state never changed → setupAuth effect never re-runs → no flash
+	});
+
+	it('sign-out: transient guard skipped via isAuthOpSettling', () => {
+		let state: SubscriptionState = {
+			sessionData: { user: { id: '1' } },
+			sessionPending: false,
+			wasAuthenticated: true,
+			authOperationPending: true // set by $sessionSignal from proxy.mjs
+		};
+
+		// onRequest: data stays, isRefetching = true
+		state = processSessionEmission(state, {
+			data: { user: { id: '1' } },
+			isPending: false,
+			isRefetching: true
+		});
+
+		// onSuccess with null (session gone after sign-out): isRefetching = false
+		state = processSessionEmission(state, {
+			data: null,
+			isPending: false,
+			isRefetching: false
+		});
+		expect(state.sessionData).toBe(null);
+		expect(state.sessionPending).toBe(false); // guard skipped
+		expect(state.wasAuthenticated).toBe(false); // reset
+		expect(state.authOperationPending).toBe(false);
+	});
+});
+
 describe('sign-in lifecycle: auth provider state transitions', () => {
 	it('produces correct ConvexAuthProvider sequence during sign-in', () => {
 		const steps: { label: string; session: BetterAuthSessionState }[] = [

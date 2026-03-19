@@ -274,11 +274,17 @@ function createSvelteAuthClientBrowser({
 	// auth request succeeds.  Between the cookie being cleared (sign-out response)
 	// and the session atom settling with null data, the Convex client's scheduled
 	// token refresh can fire and hit the token endpoint → 401.
-	// We set this flag when the signal fires while we have an active session, and
-	// clear it once the session atom finishes refetching.  fetchAccessToken skips
-	// the HTTP request while this flag is true.
+	//
+	// However, $sessionSignal is ALSO toggled on tab refocus by session-refresh.mjs.
+	// Immediately returning null when the flag is set would block valid token
+	// fetches on tab refocus → Convex AuthenticationManager reports onChange(false)
+	// → auth flash.  Instead, fetchAccessToken awaits the settling promise, then
+	// re-checks the session: still valid → proceed (tab refocus), cleared → skip
+	// (sign-out, no 401).
 	let authOperationPending = false;
 	let signalInitialized = false;
+	let authOpSettledResolve: (() => void) | null = null;
+	let authOpSettledPromise: Promise<void> | null = null;
 
 	authClient.$store.listen('$sessionSignal', () => {
 		if (!signalInitialized) {
@@ -287,6 +293,9 @@ function createSvelteAuthClientBrowser({
 		}
 		if (sessionData) {
 			authOperationPending = true;
+			authOpSettledPromise = new Promise<void>((resolve) => {
+				authOpSettledResolve = resolve;
+			});
 		}
 	});
 
@@ -303,6 +312,11 @@ function createSvelteAuthClientBrowser({
 		const isAuthOpSettling = authOperationPending && !isRefetching;
 		if (isAuthOpSettling) {
 			authOperationPending = false;
+			if (authOpSettledResolve) {
+				authOpSettledResolve();
+				authOpSettledResolve = null;
+			}
+			authOpSettledPromise = null;
 		}
 
 		if (transientGuardTimer) {
@@ -348,6 +362,7 @@ function createSvelteAuthClientBrowser({
 		authClient,
 		() => sessionData,
 		() => authOperationPending,
+		() => authOpSettledPromise,
 		logVerbose
 	);
 
@@ -418,6 +433,7 @@ const makeFetchAccessTokenBrowser = (
 	authClient: AuthClient,
 	getSessionData: () => SessionState['data'] | null,
 	getAuthOperationPending: () => boolean,
+	getAuthOpSettledPromise: () => Promise<void> | null,
 	logVerbose: (message: string) => void
 ): FetchAccessToken => {
 	// Track whether the session atom has ever reported data.
@@ -445,12 +461,25 @@ const makeFetchAccessTokenBrowser = (
 			return null;
 		}
 
-		// Skip while a session-affecting operation (sign-out, update-user, etc.)
-		// is in progress.  The session cookie may already be cleared on the server
-		// but the session atom hasn't settled yet — fetching a token now would 401.
+		// When an auth-affecting signal ($sessionSignal) has fired, wait for
+		// the session atom to settle before deciding.  This signal is shared
+		// between auth operations (sign-out via proxy.mjs) and tab-refocus
+		// refetches (session-refresh.mjs).  Immediately returning null would
+		// block valid token fetches on tab refocus → auth flash.  Instead we
+		// wait, then re-check: session survived → proceed (tab refocus),
+		// session cleared → skip (sign-out, no 401).
 		if (getAuthOperationPending()) {
-			logVerbose('browser: auth operation pending, skipping token fetch');
-			return null;
+			logVerbose('browser: auth operation pending, waiting for session to settle');
+			const settledPromise = getAuthOpSettledPromise();
+			if (settledPromise) {
+				await Promise.race([settledPromise, new Promise<void>((r) => setTimeout(r, 2000))]);
+			}
+			const sessionAfterSettle = getSessionData();
+			if (sessionHasBeenAvailable && !sessionAfterSettle) {
+				logVerbose('browser: session cleared after auth op settled, skipping token fetch');
+				return null;
+			}
+			logVerbose('browser: session still valid after auth op settled, proceeding');
 		}
 
 		const token = await fetchTokenBrowser(authClient, logVerbose);
