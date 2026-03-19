@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- fix: await settling before fetchAccessToken to prevent auth flash on tab refocus
+
 ## 0.7.0
 
 ### Minor Changes
