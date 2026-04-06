@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.2
+
+- fix: add a cookie-only `getToken(cookies)` SSR path that reads the default
+  Convex Better Auth JWT cookie names without instantiating `createAuth()`
+  inside SvelteKit SSR. This avoids split-runtime failures where Better Auth
+  config is only valid in the Convex runtime.
+- docs: deprecate the legacy `getToken(createAuth, cookies)` and
+  `getAuthState(createAuth, cookies)` SSR overloads in favor of
+  `getToken(cookies)` plus `getAuthState()`.
+
 ## 0.7.1
 
 - fix: await settling before fetchAccessToken to prevent auth flash on tab refocus
