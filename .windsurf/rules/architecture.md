@@ -45,21 +45,21 @@ These two packages have a clear layered relationship. **convex-svelte** is the f
 
 ## Responsibility boundary
 
-| Concern                                       | convex-svelte            | convex-better-auth-svelte               |
-| --------------------------------------------- | ------------------------ | --------------------------------------- |
-| ConvexClient setup                            | ✅ `setupConvex`         | delegates to convex-svelte              |
-| Auth state machine                            | ✅ `setupAuth`           | delegates to convex-svelte              |
-| `isLoading` / `isAuthenticated`               | ✅ getter in `setupAuth` | reads from convex-svelte context        |
-| Stale detection (provider changed, no effect) | ✅ in `isLoading` getter | —                                       |
-| Session atom subscription                     | —                        | ✅ `createSvelteAuthClientBrowser`      |
-| Transient guard (flash prevention)            | —                        | ✅ in session subscription              |
+| Concern                                        | convex-svelte            | convex-better-auth-svelte               |
+| ---------------------------------------------- | ------------------------ | --------------------------------------- |
+| ConvexClient setup                             | ✅ `setupConvex`         | delegates to convex-svelte              |
+| Auth state machine                             | ✅ `setupAuth`           | delegates to convex-svelte              |
+| `isLoading` / `isAuthenticated`                | ✅ getter in `setupAuth` | reads from convex-svelte context        |
+| Stale detection (provider changed, no effect)  | ✅ in `isLoading` getter | —                                       |
+| Session atom subscription                      | —                        | ✅ `createSvelteAuthClientBrowser`      |
+| Transient guard (flash prevention)             | —                        | ✅ in session subscription              |
 | Auth operation tracking (bounce + 401 + flash) | —                        | ✅ `$store.listen` + `isAuthOpSettling` |
-| Navigation bridge (sign-in gap)               | —                        | ✅ `beforeNavigate` + 50ms timer        |
-| `fetchAccessToken`                            | generic parameter        | ✅ `authClient.convex.token()`          |
-| SSR state from cookies                        | generic `initialState`   | ✅ `getAuthState` / `getServerState`    |
-| `useQuery` / `usePaginatedQuery`              | ✅                       | re-exports from convex-svelte           |
-| External session (device auth, CLI)           | —                        | ✅ `externalSession` option             |
-| One-time token verification                   | —                        | ✅ `handleOneTimeToken`                 |
+| Navigation bridge (sign-in gap)                | —                        | ✅ `beforeNavigate` + 50ms timer        |
+| `fetchAccessToken`                             | generic parameter        | ✅ `authClient.convex.token()`          |
+| SSR state from cookies                         | generic `initialState`   | ✅ `getAuthState` / `getServerState`    |
+| `useQuery` / `usePaginatedQuery`               | ✅                       | re-exports from convex-svelte           |
+| External session (device auth, CLI)            | —                        | ✅ `externalSession` option             |
+| One-time token verification                    | —                        | ✅ `handleOneTimeToken`                 |
 
 ## Timing mechanisms in convex-better-auth-svelte
 

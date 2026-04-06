@@ -9,7 +9,7 @@ vi.mock('better-auth/cookies', () => ({
 }));
 
 vi.mock('@convex-dev/better-auth/plugins', () => ({
-	JWT_COOKIE_NAME: 'jwt'
+	JWT_COOKIE_NAME: 'convex_jwt'
 }));
 
 vi.mock('convex/browser', () => ({
@@ -26,14 +26,30 @@ import { createSvelteKitHandler, getToken, getAuthState } from './index.js';
 
 const mockCreateCookieGetter = vi.mocked(createCookieGetter);
 
-const mockCreateAuth = (() => ({ options: {} })) as unknown as Parameters<typeof getToken>[0];
+const mockCreateAuth = (() => ({ options: {} })) as never;
 
-const mockCookies = (map: Record<string, string>): Parameters<typeof getToken>[1] =>
-	({ get: (name: string) => map[name] }) as Parameters<typeof getToken>[1];
+const mockCookies = (map: Record<string, string>) =>
+	({
+		get: (name: string) => map[name]
+	}) as never;
 
 describe('getToken', () => {
 	beforeEach(() => {
-		vi.restoreAllMocks();
+		vi.clearAllMocks();
+	});
+
+	it('reads the default insecure cookie without instantiating createAuth', () => {
+		const token = getToken(mockCookies({ 'better-auth.convex_jwt': 'my-token' }));
+
+		expect(token).toBe('my-token');
+		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
+	});
+
+	it('reads the default secure cookie without instantiating createAuth', () => {
+		const token = getToken(mockCookies({ '__Secure-better-auth.convex_jwt': 'secure-token' }));
+
+		expect(token).toBe('secure-token');
+		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
 	});
 
 	it('returns the token when primary cookie name matches', async () => {
@@ -100,11 +116,18 @@ describe('getToken', () => {
 		const token = await getToken(mockCreateAuth, mockCookies({}));
 		expect(token).toBeUndefined();
 	});
+
+	it('supports split-runtime SSR by avoiding createAuth entirely when only cookies are passed', () => {
+		const token = getToken(mockCookies({ '__Secure-better-auth.convex_jwt': 'proxy-token' }));
+
+		expect(token).toBe('proxy-token');
+		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
+	});
 });
 
 describe('getAuthState', () => {
 	beforeEach(() => {
-		vi.restoreAllMocks();
+		vi.clearAllMocks();
 		mockGetServerToken.mockReturnValue(undefined);
 	});
 
