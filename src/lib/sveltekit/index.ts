@@ -15,44 +15,81 @@ export type InitialAuthState = {
 	isAuthenticated: boolean;
 };
 
-export const getToken = async <DataModel extends GenericDataModel>(
-	createAuth: CreateAuth<DataModel>,
-	cookies: Cookies
-) => {
-	const options = createAuth({} as GenericCtx<DataModel>).options;
-	const createCookie = createCookieGetter(options);
-	const cookie = createCookie(JWT_COOKIE_NAME);
-	const token = cookies.get(cookie.name);
+const DEFAULT_CONVEX_JWT_COOKIE_NAME = `better-auth.${JWT_COOKIE_NAME}`;
+const DEFAULT_CONVEX_JWT_COOKIE_NAMES = [
+	`__Secure-${DEFAULT_CONVEX_JWT_COOKIE_NAME}`,
+	DEFAULT_CONVEX_JWT_COOKIE_NAME
+] as const;
 
-	if (!token) {
-		const isSecure = cookie.name.startsWith('__Secure-');
-		const insecureCookieName = cookie.name.replace('__Secure-', '');
-		const secureCookieName = isSecure ? cookie.name : `__Secure-${insecureCookieName}`;
-
-		const insecureValue = cookies.get(insecureCookieName);
-		const secureValue = cookies.get(secureCookieName);
-
-		// If we expected secure and found insecure set
-		if (isSecure && insecureValue) {
-			console.warn(
-				`Looking for secure cookie "${cookie.name}" but found insecure cookie "${insecureCookieName}". ` +
-					`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
-			);
-			return insecureValue;
-		}
-
-		// If we expected insecure and found secure set
-		if (!isSecure && secureValue) {
-			console.warn(
-				`Looking for insecure cookie "${cookie.name}" but found secure cookie "${secureCookieName}". ` +
-					`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
-			);
-			return secureValue;
-		}
+const getTokenFromKnownCookieNames = (cookies: Cookies, cookieNames: readonly string[]) => {
+	for (const cookieName of cookieNames) {
+		const token = cookies.get(cookieName);
+		if (token) return token;
 	}
 
-	return token;
+	return undefined;
 };
+
+export function getToken(cookies: Cookies): string | undefined;
+/**
+ * @deprecated Pass `cookies` directly instead: `getToken(cookies)`.
+ * This overload instantiates `createAuth()` during SvelteKit SSR, which can
+ * fail in split-runtime deployments where Better Auth config only exists in
+ * the Convex runtime.
+ */
+export function getToken<DataModel extends GenericDataModel>(
+	createAuth: CreateAuth<DataModel>,
+	cookies: Cookies
+): Promise<string | undefined>;
+export function getToken<DataModel extends GenericDataModel>(
+	createAuthOrCookies: CreateAuth<DataModel> | Cookies,
+	maybeCookies?: Cookies
+): string | undefined | Promise<string | undefined> {
+	if (!maybeCookies) {
+		return getTokenFromKnownCookieNames(
+			createAuthOrCookies as Cookies,
+			DEFAULT_CONVEX_JWT_COOKIE_NAMES
+		);
+	}
+
+	return Promise.resolve().then(() => {
+		const createAuth = createAuthOrCookies as CreateAuth<DataModel>;
+		const cookies = maybeCookies;
+		const options = createAuth({} as GenericCtx<DataModel>).options;
+		const createCookie = createCookieGetter(options);
+		const cookie = createCookie(JWT_COOKIE_NAME);
+		const token = cookies.get(cookie.name);
+
+		if (!token) {
+			const isSecure = cookie.name.startsWith('__Secure-');
+			const insecureCookieName = cookie.name.replace('__Secure-', '');
+			const secureCookieName = isSecure ? cookie.name : `__Secure-${insecureCookieName}`;
+
+			const insecureValue = cookies.get(insecureCookieName);
+			const secureValue = cookies.get(secureCookieName);
+
+			// If we expected secure and found insecure set
+			if (isSecure && insecureValue) {
+				console.warn(
+					`Looking for secure cookie "${cookie.name}" but found insecure cookie "${insecureCookieName}". ` +
+						`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
+				);
+				return insecureValue;
+			}
+
+			// If we expected insecure and found secure set
+			if (!isSecure && secureValue) {
+				console.warn(
+					`Looking for insecure cookie "${cookie.name}" but found secure cookie "${secureCookieName}". ` +
+						`This typically happens behind a reverse proxy. Consider aligning your baseURL with the external URL.`
+				);
+				return secureValue;
+			}
+		}
+
+		return token;
+	});
+}
 
 /**
  * Get initial auth state for SSR.
@@ -85,6 +122,11 @@ export const getToken = async <DataModel extends GenericDataModel>(
  * ```
  */
 export function getAuthState(): InitialAuthState;
+/**
+ * @deprecated Prefer `getAuthState()` with `withServerConvexToken(...)` in
+ * `hooks.server.ts`, or call `getToken(cookies)` directly when you need the
+ * raw token during SSR setup.
+ */
 export function getAuthState<DataModel extends GenericDataModel>(
 	createAuth: CreateAuth<DataModel>,
 	cookies: Cookies

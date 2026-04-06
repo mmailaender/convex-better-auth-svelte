@@ -1,12 +1,11 @@
 import { api } from '$convex/_generated/api.js';
-import { createAuth } from '$convex/auth.js';
 import { createConvexHttpClient, getAuthState } from '$lib/sveltekit/index.js';
 import type { LayoutServerLoad } from './$types.js';
 
-export const load = (async ({ locals, cookies }) => {
+export const load = (async ({ locals }) => {
 	const client = createConvexHttpClient({ token: locals.token });
 
-	const authState = await getAuthState(createAuth, cookies);
+	const authState = getAuthState();
 
 	console.log('authState', authState);
 	try {
