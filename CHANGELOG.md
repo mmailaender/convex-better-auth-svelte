@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.3
+
+- fix: preserve the original SvelteKit request host/protocol when proxying auth
+  requests to Convex. The SvelteKit handler now forwards
+  `x-better-auth-forwarded-host` and `x-better-auth-forwarded-proto` so
+  Better Auth dynamic base URL validation can resolve OAuth callbacks and other
+  generated URLs against the user-facing app origin instead of the Convex site
+  URL.
+- fix: only forward the auth-relevant request headers to Convex instead of
+  cloning every incoming platform header. This avoids leaking Cloudflare-specific
+  headers such as `CF-*` into the Convex site request while still preserving
+  cookies, auth headers, origin, referrer, and user agent.
+
 ## 0.7.2
 
 - fix: add a cookie-only `getToken(cookies)` SSR path that reads the default

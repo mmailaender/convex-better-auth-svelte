@@ -20,6 +20,34 @@ const DEFAULT_CONVEX_JWT_COOKIE_NAMES = [
 	`__Secure-${DEFAULT_CONVEX_JWT_COOKIE_NAME}`,
 	DEFAULT_CONVEX_JWT_COOKIE_NAME
 ] as const;
+const FORWARDED_AUTH_HEADER_NAMES = new Set([
+	'accept',
+	'authorization',
+	'better-auth-cookie',
+	'content-type',
+	'cookie',
+	'origin',
+	'referer',
+	'user-agent'
+]);
+
+const buildForwardedAuthHeaders = (headers: Headers, nextUrl: string, requestUrl: URL) => {
+	const forwardedHeaders = new Headers();
+
+	for (const [headerName, headerValue] of headers.entries()) {
+		if (FORWARDED_AUTH_HEADER_NAMES.has(headerName.toLowerCase())) {
+			forwardedHeaders.set(headerName, headerValue);
+		}
+	}
+
+	forwardedHeaders.set('host', new URL(nextUrl).host);
+	forwardedHeaders.set('x-forwarded-host', requestUrl.host);
+	forwardedHeaders.set('x-forwarded-proto', requestUrl.protocol.replace(/:$/, ''));
+	forwardedHeaders.set('x-better-auth-forwarded-host', requestUrl.host);
+	forwardedHeaders.set('x-better-auth-forwarded-proto', requestUrl.protocol.replace(/:$/, ''));
+	forwardedHeaders.set('accept-encoding', 'identity');
+	return forwardedHeaders;
+};
 
 const getTokenFromKnownCookieNames = (cookies: Cookies, cookieNames: readonly string[]) => {
 	for (const cookieName of cookieNames) {
@@ -178,8 +206,14 @@ const handler = (request: Request, opts?: { convexSiteUrl?: string }) => {
 
 	const nextUrl = `${convexSiteUrl}${requestUrl.pathname}${requestUrl.search}`;
 	const newRequest = new Request(nextUrl, request);
-	newRequest.headers.set('host', new URL(nextUrl).host);
-	newRequest.headers.set('accept-encoding', 'application/json');
+	const forwardedHeaders = buildForwardedAuthHeaders(request.headers, nextUrl, requestUrl);
+
+	for (const headerName of [...newRequest.headers.keys()]) {
+		newRequest.headers.delete(headerName);
+	}
+	for (const [headerName, headerValue] of forwardedHeaders.entries()) {
+		newRequest.headers.set(headerName, headerValue);
+	}
 
 	return fetch(newRequest, { method: request.method, redirect: 'manual' });
 };

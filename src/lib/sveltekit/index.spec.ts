@@ -232,4 +232,133 @@ describe('createSvelteKitHandler', () => {
 		expect(capturedRequest).toBeDefined();
 		expect(capturedRequest!.url).toBe('https://convex.example.com/api/auth/callback?code=abc123');
 	});
+
+	it('should not forward Cloudflare edge headers to the upstream request', async () => {
+		const { GET } = createSvelteKitHandler();
+
+		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
+			headers: {
+				host: 'app.example.com',
+				'cf-connecting-ip': '203.0.113.10',
+				'cf-ipcountry': 'DE',
+				'cf-ray': 'abc123-FRA'
+			}
+		});
+
+		await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
+
+		expect(capturedRequest).toBeDefined();
+		expect(capturedRequest!.headers.get('cf-connecting-ip')).toBeNull();
+		expect(capturedRequest!.headers.get('cf-ipcountry')).toBeNull();
+		expect(capturedRequest!.headers.get('cf-ray')).toBeNull();
+	});
+
+	it('should avoid upstream Cloudflare header rejection by stripping cf-connecting-ip', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: Request) => {
+				capturedRequest = input;
+				if (input.headers.has('cf-connecting-ip')) {
+					return new Response('invalid cf header', { status: 403 });
+				}
+				return new Response('{}', { status: 200 });
+			})
+		);
+
+		const { GET } = createSvelteKitHandler();
+		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
+			headers: {
+				host: 'app.example.com',
+				'cf-connecting-ip': '203.0.113.10'
+			}
+		});
+
+		const response = await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
+
+		expect(response.status).toBe(200);
+		expect(capturedRequest).toBeDefined();
+		expect(capturedRequest!.headers.get('cf-connecting-ip')).toBeNull();
+	});
+
+	it('should forward only the auth headers needed by Better Auth', async () => {
+		const { GET } = createSvelteKitHandler();
+
+		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
+			headers: {
+				host: 'app.example.com',
+				accept: 'application/json',
+				authorization: 'Bearer session-token',
+				'better-auth-cookie': 'session_token=abc123',
+				'content-type': 'application/json',
+				cookie: 'better-auth.session_token=abc123',
+				origin: 'https://app.example.com',
+				referer: 'https://app.example.com/sign-in',
+				'user-agent': 'Mozilla/5.0',
+				'x-custom-debug': 'should-not-forward'
+			}
+		});
+
+		await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
+
+		expect(capturedRequest).toBeDefined();
+		expect(capturedRequest!.headers.get('accept')).toBe('application/json');
+		expect(capturedRequest!.headers.get('authorization')).toBe('Bearer session-token');
+		expect(capturedRequest!.headers.get('better-auth-cookie')).toBe('session_token=abc123');
+		expect(capturedRequest!.headers.get('content-type')).toBe('application/json');
+		expect(capturedRequest!.headers.get('cookie')).toBe('better-auth.session_token=abc123');
+		expect(capturedRequest!.headers.get('origin')).toBe('https://app.example.com');
+		expect(capturedRequest!.headers.get('referer')).toBe('https://app.example.com/sign-in');
+		expect(capturedRequest!.headers.get('user-agent')).toBe('Mozilla/5.0');
+		expect(capturedRequest!.headers.get('accept-encoding')).toBe('identity');
+		expect(capturedRequest!.headers.get('x-custom-debug')).toBeNull();
+	});
+
+	it('should derive trusted forwarded host headers from the external request URL', async () => {
+		const { GET } = createSvelteKitHandler();
+
+		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
+			headers: {
+				host: 'app.example.com',
+				forwarded: 'for=203.0.113.10;proto=http;host=spoofed.example.com',
+				via: '1.1 proxy.example.com',
+				'x-forwarded-for': '203.0.113.10',
+				'x-forwarded-host': 'spoofed.example.com',
+				'x-forwarded-proto': 'http',
+				'x-forwarded-port': '80',
+				'x-real-ip': '203.0.113.10'
+			}
+		});
+
+		await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
+
+		expect(capturedRequest).toBeDefined();
+		expect(capturedRequest!.headers.get('forwarded')).toBeNull();
+		expect(capturedRequest!.headers.get('via')).toBeNull();
+		expect(capturedRequest!.headers.get('x-forwarded-for')).toBeNull();
+		expect(capturedRequest!.headers.get('x-forwarded-host')).toBe('app.example.com');
+		expect(capturedRequest!.headers.get('x-forwarded-proto')).toBe('https');
+		expect(capturedRequest!.headers.get('x-better-auth-forwarded-host')).toBe('app.example.com');
+		expect(capturedRequest!.headers.get('x-better-auth-forwarded-proto')).toBe('https');
+		expect(capturedRequest!.headers.get('x-forwarded-port')).toBeNull();
+		expect(capturedRequest!.headers.get('x-real-ip')).toBeNull();
+	});
+	it('should strip headers named by the Connection header', async () => {
+		const { GET } = createSvelteKitHandler();
+
+		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
+			headers: {
+				host: 'app.example.com',
+				connection: 'keep-alive, x-custom-hop',
+				'keep-alive': 'timeout=5',
+				'x-custom-hop': 'secret-hop-value'
+			}
+		});
+
+		await GET({ request: incomingRequest } as Parameters<typeof GET>[0]);
+
+		expect(capturedRequest).toBeDefined();
+		expect(capturedRequest!.headers.get('connection')).toBeNull();
+		expect(capturedRequest!.headers.get('keep-alive')).toBeNull();
+		expect(capturedRequest!.headers.get('x-custom-hop')).toBeNull();
+	});
 });
