@@ -42,6 +42,7 @@
 		"**/*.css"
 	],
 	"type": "module",
+	"svelte": "./dist/svelte/index.js",
 	"exports": {
 		"./svelte": {
 			"types": "./dist/svelte/index.d.ts",
