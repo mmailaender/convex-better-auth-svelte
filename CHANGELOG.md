@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.4
+
+- fix: declare the package's top-level `svelte` entry so SvelteKit can reliably
+  detect and bundle the Svelte integration during SSR.
+
 ## 0.7.3
 
 - fix: preserve the original SvelteKit request host/protocol when proxying auth

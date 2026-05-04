@@ -1,7 +1,7 @@
 {
 	"name": "@mmailaender/convex-better-auth-svelte",
 	"author": "Micha Mailaender",
-	"version": "0.7.3",
+	"version": "0.7.4",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
