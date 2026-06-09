@@ -136,6 +136,8 @@ describe('fetchAccessToken: SSR hydration — sessionHasBeenAvailable guard', ()
 	it('sessionHasBeenAvailable stays true once set (never resets)', () => {
 		let sessionHasBeenAvailable = false;
 
+		expect(shouldSkipTokenFetch(sessionHasBeenAvailable, null)).toBe(false);
+
 		// Session becomes available
 		sessionHasBeenAvailable = true;
 
