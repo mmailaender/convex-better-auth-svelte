@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Test Scenarios:
@@ -10,6 +10,24 @@ import { test, expect } from '@playwright/test';
  * 6. Public Queries - Work regardless of auth state
  * 7. Protected Queries - Skip when unauthenticated, run when authenticated
  */
+
+async function signInFresh(page: Page) {
+	const email = process.env.TEST_USER_EMAIL;
+	const password = process.env.TEST_USER_PASSWORD;
+
+	if (!email || !password) {
+		throw new Error('TEST_USER_EMAIL and TEST_USER_PASSWORD must be set');
+	}
+
+	await page.goto('/test/client-only');
+	await expect(page.locator('[data-testid="sign-in-form"]')).toBeVisible({ timeout: 10000 });
+	await page.fill('[data-testid="email-input"]', email);
+	await page.fill('[data-testid="password-input"]', password);
+	await page.click('[data-testid="sign-in-button"]');
+	await expect(page.locator('[data-testid="authenticated-state"]')).toBeVisible({
+		timeout: 15000
+	});
+}
 
 test.describe('SSR Authentication', () => {
 	test('authenticated user sees content immediately without loading flash', async ({ page }) => {
@@ -107,6 +125,12 @@ test.describe('SSR Not Authenticated', () => {
 });
 
 test.describe('SSR Sign Out Flow', () => {
+	test.use({ storageState: { cookies: [], origins: [] } });
+
+	test.beforeEach(async ({ page }) => {
+		await signInFresh(page);
+	});
+
 	test('authenticated user can sign out', async ({ page }) => {
 		await page.goto('/test/ssr');
 

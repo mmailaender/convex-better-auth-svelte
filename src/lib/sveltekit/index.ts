@@ -1,11 +1,12 @@
 import { createCookieGetter } from 'better-auth/cookies';
+import type { BetterAuthOptions } from 'better-auth';
 import type { Cookies, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
 import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
 import type { GenericDataModel } from 'convex/server';
-import { _getServerToken } from '@mmailaender/convex-svelte/sveltekit';
+import { _getServerToken } from 'convex-svelte/sveltekit';
 
 /**
  * Initial auth state that can be passed from server to client.
@@ -58,6 +59,14 @@ const getTokenFromKnownCookieNames = (cookies: Cookies, cookieNames: readonly st
 	return undefined;
 };
 
+const normalizeCookieOptions = (options: ReturnType<CreateAuth<GenericDataModel>>['options']) =>
+	({
+		...options,
+		trustedOrigins: Array.isArray(options.trustedOrigins)
+			? options.trustedOrigins.filter((origin): origin is string => typeof origin === 'string')
+			: options.trustedOrigins
+	}) as BetterAuthOptions;
+
 export function getToken(cookies: Cookies): string | undefined;
 /**
  * @deprecated Pass `cookies` directly instead: `getToken(cookies)`.
@@ -84,7 +93,7 @@ export function getToken<DataModel extends GenericDataModel>(
 		const createAuth = createAuthOrCookies as CreateAuth<DataModel>;
 		const cookies = maybeCookies;
 		const options = createAuth({} as GenericCtx<DataModel>).options;
-		const createCookie = createCookieGetter(options);
+		const createCookie = createCookieGetter(normalizeCookieOptions(options));
 		const cookie = createCookie(JWT_COOKIE_NAME);
 		const token = cookies.get(cookie.name);
 

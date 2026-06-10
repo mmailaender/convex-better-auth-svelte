@@ -17,7 +17,7 @@ vi.mock('convex/browser', () => ({
 }));
 
 const mockGetServerToken = vi.fn<() => string | undefined>(() => undefined);
-vi.mock('@mmailaender/convex-svelte/sveltekit', () => ({
+vi.mock('convex-svelte/sveltekit', () => ({
 	_getServerToken: (...args: unknown[]) => mockGetServerToken(...(args as []))
 }));
 
@@ -65,6 +65,26 @@ describe('getToken', () => {
 			mockCookies({ 'better-auth.convex_jwt': 'my-token' })
 		);
 		expect(token).toBe('my-token');
+	});
+
+	it('removes nullish trusted origins before creating the cookie getter', async () => {
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+		const createAuth = (() => ({
+			options: {
+				trustedOrigins: ['https://app.example.com', null, undefined]
+			}
+		})) as never;
+
+		await getToken(createAuth, mockCookies({ 'better-auth.convex_jwt': 'my-token' }));
+
+		expect(mockCreateCookieGetter).toHaveBeenCalledWith({
+			trustedOrigins: ['https://app.example.com']
+		});
 	});
 
 	it('returns insecure fallback when expected secure cookie is missing', async () => {
