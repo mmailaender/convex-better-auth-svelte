@@ -38,6 +38,7 @@ jobs:
         run: pnpm build
         env:
           PUBLIC_CONVEX_URL: ${{ vars.PUBLIC_CONVEX_URL }}
+          PUBLIC_CONVEX_SITE_URL: ${{ vars.PUBLIC_CONVEX_SITE_URL }}
 
       - name: Lint package
         run: pnpm lint:package
@@ -49,11 +50,13 @@ jobs:
         run: pnpm test
         env:
           PUBLIC_CONVEX_URL: ${{ vars.PUBLIC_CONVEX_URL }}
+          PUBLIC_CONVEX_SITE_URL: ${{ vars.PUBLIC_CONVEX_SITE_URL }}
 
       - name: Check
         run: pnpm check
         env:
           PUBLIC_CONVEX_URL: ${{ vars.PUBLIC_CONVEX_URL }}
+          PUBLIC_CONVEX_SITE_URL: ${{ vars.PUBLIC_CONVEX_SITE_URL }}
 
       - name: Lint
         run: pnpm lint

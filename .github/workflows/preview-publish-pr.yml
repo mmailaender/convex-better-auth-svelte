@@ -48,6 +48,7 @@ jobs:
         run: pnpm build
         env:
           PUBLIC_CONVEX_URL: ${{ vars.PUBLIC_CONVEX_URL }}
+          PUBLIC_CONVEX_SITE_URL: ${{ vars.PUBLIC_CONVEX_SITE_URL }}
 
       - name: Publish package preview
         run: pnpm dlx pkg-pr-new publish --template '.'
