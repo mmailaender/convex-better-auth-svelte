@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0
+
+### Minor Changes
+
+- f4c99d1: chore: migrate from @mmailaender/convex-svelte to convex-svelte
+
+  To migrate you need to install `convex-svelte@0.13.0` and only replace the `@mmailaender/convex-svelte` imports with `convex-svelte` imports in your code.
+
 ## 0.7.4
 
 - fix: declare the package's top-level `svelte` entry so SvelteKit can reliably
