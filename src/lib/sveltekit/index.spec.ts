@@ -67,6 +67,26 @@ describe('getToken', () => {
 		expect(token).toBe('my-token');
 	});
 
+	it('removes nullish trusted origins before creating the cookie getter', async () => {
+		mockCreateCookieGetter.mockReturnValue(
+			() =>
+				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
+					ReturnType<typeof createCookieGetter>
+				>
+		);
+		const createAuth = (() => ({
+			options: {
+				trustedOrigins: ['https://app.example.com', null, undefined]
+			}
+		})) as never;
+
+		await getToken(createAuth, mockCookies({ 'better-auth.convex_jwt': 'my-token' }));
+
+		expect(mockCreateCookieGetter).toHaveBeenCalledWith({
+			trustedOrigins: ['https://app.example.com']
+		});
+	});
+
 	it('returns insecure fallback when expected secure cookie is missing', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		mockCreateCookieGetter.mockReturnValue(

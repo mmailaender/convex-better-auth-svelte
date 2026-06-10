@@ -1,8 +1,4 @@
-import {
-	initConvex,
-	encodeConvexLoad,
-	decodeConvexLoad
-} from 'convex-svelte/sveltekit';
+import { initConvex, encodeConvexLoad, decodeConvexLoad } from 'convex-svelte/sveltekit';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
 // Initialize the Convex singleton on both server and client.

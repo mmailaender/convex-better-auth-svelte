@@ -1,11 +1,6 @@
 import { getContext, setContext, onMount } from 'svelte';
 
-import {
-	setupConvex,
-	setupAuth,
-	setConvexClientContext,
-	_authContextKey
-} from 'convex-svelte';
+import { setupConvex, setupAuth, setConvexClientContext, _authContextKey } from 'convex-svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { beforeNavigate } from '$app/navigation';
 
