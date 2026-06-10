@@ -57,7 +57,7 @@
 	},
 	"peerDependencies": {
 		"@convex-dev/better-auth": ">=0.10.10",
-		"@mmailaender/convex-svelte": ">=0.15.0",
+		"convex-svelte": ">=0.13.0",
 		"better-auth": "^1.4.9",
 		"convex": "^1.31.0",
 		"svelte": "^5.0.0"
@@ -68,7 +68,7 @@
 		"@convex-dev/eslint-plugin": "^2.0.0",
 		"@eslint/compat": "^2.1.0",
 		"@eslint/js": "^10.0.1",
-		"@mmailaender/convex-svelte": "^0.19.0",
+		"convex-svelte": "^0.13.0",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.64.0",
@@ -78,7 +78,7 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^25.9.2",
 		"@vitest/browser": "^4.1.8",
-		"better-auth": "1.6.9",
+		"better-auth": "1.6.15",
 		"concurrently": "^10.0.3",
 		"convex": "1.40.0",
 		"dotenv": "^17.4.2",

@@ -5,7 +5,7 @@ import {
 	setupAuth,
 	setConvexClientContext,
 	_authContextKey
-} from '@mmailaender/convex-svelte';
+} from 'convex-svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { beforeNavigate } from '$app/navigation';
 
@@ -592,13 +592,13 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 /*                               useAuth hook                                 */
 /* -------------------------------------------------------------------------- */
 
-// _authContextKey is imported from @mmailaender/convex-svelte (set by setupAuth)
+// _authContextKey is imported from convex-svelte (set by setupAuth)
 
 /**
  * Hook to access authentication state and functions.
  * Must be used within a component that has createSvelteAuthClient called in its parent tree.
  *
- * Returns a superset of `useAuth()` from `@mmailaender/convex-svelte`:
+ * Returns a superset of `useAuth()` from `convex-svelte`:
  * - `isLoading` / `isAuthenticated` — from the base library's setupAuth context
  * - `fetchAccessToken` — Better Auth-specific, for manually fetching a Convex JWT
  */

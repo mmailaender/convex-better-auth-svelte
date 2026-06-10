@@ -6,7 +6,7 @@ trigger: always_on
 
 These two packages have a clear layered relationship. **convex-svelte** is the foundation; **convex-better-auth-svelte** is a thin adapter on top.
 
-## convex-svelte (`@mmailaender/convex-svelte`)
+## convex-svelte (`convex-svelte`)
 
 **Auth-provider-agnostic** Svelte library for Convex. Owns the entire auth state machine.
 

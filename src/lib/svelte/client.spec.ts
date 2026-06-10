@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Pure-logic helpers for the reactive getter that createSvelteAuthClientBrowser
-// builds and passes to setupAuth() from @mmailaender/convex-svelte.
+// builds and passes to setupAuth() from convex-svelte.
 //
 // The auth state machine (setAuth/clearAuth toggling, SSR hydration, Convex
 // backend confirmation) now lives in the base library's setupAuth(). These

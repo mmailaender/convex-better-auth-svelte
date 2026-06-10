@@ -17,7 +17,7 @@ vi.mock('convex/browser', () => ({
 }));
 
 const mockGetServerToken = vi.fn<() => string | undefined>(() => undefined);
-vi.mock('@mmailaender/convex-svelte/sveltekit', () => ({
+vi.mock('convex-svelte/sveltekit', () => ({
 	_getServerToken: (...args: unknown[]) => mockGetServerToken(...(args as []))
 }));
 

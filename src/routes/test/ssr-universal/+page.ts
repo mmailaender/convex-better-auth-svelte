@@ -6,7 +6,7 @@
  * during SSR, and by the authenticated singleton ConvexClient during client-side
  * navigation.
  */
-import { convexLoad } from '@mmailaender/convex-svelte/sveltekit';
+import { convexLoad } from 'convex-svelte/sveltekit';
 import { api } from '$convex/_generated/api.js';
 
 export const load = async () => {

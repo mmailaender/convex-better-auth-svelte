@@ -5,7 +5,7 @@ import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
 import type { GenericDataModel } from 'convex/server';
-import { _getServerToken } from '@mmailaender/convex-svelte/sveltekit';
+import { _getServerToken } from 'convex-svelte/sveltekit';
 
 /**
  * Initial auth state that can be passed from server to client.
