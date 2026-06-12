@@ -7,6 +7,10 @@
 		"type": "git",
 		"url": "git+https://github.com/mmailaender/convex-better-auth-svelte.git"
 	},
+	"homepage": "https://github.com/mmailaender/convex-better-auth-svelte#readme",
+	"bugs": {
+		"url": "https://github.com/mmailaender/convex-better-auth-svelte/issues"
+	},
 	"publishConfig": {
 		"access": "public"
 	},
