@@ -10,6 +10,8 @@ import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-aut
 import type { createAuthClient } from 'better-auth/svelte';
 import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
 
+import { fetchTokenBrowser } from './fetch-token.js';
+
 /* -------------------------------------------------------------------------- */
 /*                                  Types                                     */
 /* -------------------------------------------------------------------------- */
@@ -511,51 +513,6 @@ const makeFetchAccessTokenExternal = (
 			return null;
 		}
 	};
-};
-
-/* -------------------------------------------------------------------------- */
-/*                          Token helpers                                     */
-/* -------------------------------------------------------------------------- */
-
-const fetchTokenBrowser = async (
-	authClient: AuthClient,
-	logVerbose: (message: string) => void
-): Promise<string | null> => {
-	const initialBackoff = 100;
-	const maxBackoff = 1000;
-	let retries = 0;
-
-	const nextBackoff = () => {
-		const baseBackoff = initialBackoff * Math.pow(2, retries);
-		retries += 1;
-		const actualBackoff = Math.min(baseBackoff, maxBackoff);
-		const jitter = actualBackoff * (Math.random() - 0.5);
-		return actualBackoff + jitter;
-	};
-
-	const fetchWithRetry = async (): Promise<string | null> => {
-		try {
-			const { data } = await authClient.convex.token();
-			return data?.token || null;
-		} catch (e) {
-			if (!isNetworkError(e)) {
-				// Non-network errors (e.g. 401/403 after session expiry) mean
-				// the session is gone — return null instead of throwing.
-				logVerbose(`fetchToken failed with non-network error: ${e}`);
-				return null;
-			}
-			if (retries > 10) {
-				logVerbose(`fetchToken failed with network error, giving up`);
-				throw e;
-			}
-			const backoff = nextBackoff();
-			logVerbose(`fetchToken failed with network error, attempting retrying in ${backoff}ms`);
-			await new Promise((resolve) => setTimeout(resolve, backoff));
-			return fetchWithRetry();
-		}
-	};
-
-	return fetchWithRetry();
 };
 
 // Handle one-time token verification (equivalent to useEffect)
