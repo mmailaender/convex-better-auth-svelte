@@ -6,9 +6,6 @@ import { beforeNavigate } from '$app/navigation';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
-import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-auth';
-import type { createAuthClient } from 'better-auth/svelte';
-import type { crossDomainClient, convexClient } from '@convex-dev/better-auth/client/plugins';
 
 import { fetchTokenBrowser } from './fetch-token.js';
 
@@ -16,32 +13,59 @@ import { fetchTokenBrowser } from './fetch-token.js';
 /*                                  Types                                     */
 /* -------------------------------------------------------------------------- */
 
-type CrossDomainClient = ReturnType<typeof crossDomainClient>;
-type ConvexClientBetterAuth = ReturnType<typeof convexClient>;
-type PluginsWithCrossDomain = (
-	| CrossDomainClient
-	| ConvexClientBetterAuth
-	| BetterAuthClientPlugin
-)[];
-type PluginsWithoutCrossDomain = (ConvexClientBetterAuth | BetterAuthClientPlugin)[];
-type AuthClientWithPlugins<Plugins extends PluginsWithCrossDomain | PluginsWithoutCrossDomain> =
-	ReturnType<
-		typeof createAuthClient<
-			BetterAuthClientOptions & {
-				plugins: Plugins;
-			}
-		>
-	>;
-export type AuthClient =
-	| AuthClientWithPlugins<PluginsWithCrossDomain>
-	| AuthClientWithPlugins<PluginsWithoutCrossDomain>;
+/**
+ * The slice of the Better Auth session state this integration reads.
+ * The session payload itself is treated as opaque — only its presence matters.
+ */
+type SessionState = {
+	data: unknown;
+	isPending: boolean;
+};
 
-type ExtractSessionState<T> = T extends {
-	subscribe(fn: (state: infer S) => void): unknown;
-}
-	? S
-	: never;
-type SessionState = ExtractSessionState<ReturnType<AuthClient['useSession']>>;
+/**
+ * Minimal structural view of a Better Auth client created with the
+ * `convexClient()` plugin (see {@link ConvexTokenClient} in fetch-token.ts for
+ * the same approach). Deliberately NOT derived from
+ * `ReturnType<typeof createAuthClient<...>>`: that inference is not stable
+ * across Better Auth versions (1.6.23 collapses the session type of a
+ * generically-typed plugins array to `never`), and this integration only
+ * needs the members below. Members are declared as methods so parameter
+ * checks stay bivariant against whichever Better Auth version the consumer
+ * has installed.
+ */
+export type AuthClient = {
+	$store: {
+		listen(signal: string, listener: () => void): void;
+	};
+	useSession(): {
+		subscribe(listener: (state: SessionState) => void): unknown;
+	};
+	getSession(options?: { fetchOptions?: { headers?: Record<string, string> } }): Promise<unknown>;
+	convex: {
+		token(
+			data?: undefined,
+			fetchOptions?: { headers?: Record<string, string> }
+		): Promise<{
+			data: { token?: string | null } | null;
+			error: { status?: number } | null;
+		}>;
+	};
+};
+
+/**
+ * Structural view of the additional members present when the client was
+ * created with the `crossDomainClient()` plugin.
+ */
+type CrossDomainAuthClient = AuthClient & {
+	crossDomain: {
+		oneTimeToken: {
+			verify(args: { token: string }): Promise<{
+				data: { session: { token: string } } | null;
+			}>;
+		};
+	};
+	updateSession(): void;
+};
 
 type FetchAccessToken = (options: { forceRefreshToken: boolean }) => Promise<string | null>;
 
@@ -520,7 +544,7 @@ const handleOneTimeToken = async (authClient: AuthClient) => {
 	const url = new URL(window.location?.href);
 	const token = url.searchParams.get('ott');
 	if (token) {
-		const authClientWithCrossDomain = authClient as AuthClientWithPlugins<PluginsWithCrossDomain>;
+		const authClientWithCrossDomain = authClient as CrossDomainAuthClient;
 		url.searchParams.delete('ott');
 		const result = await authClientWithCrossDomain.crossDomain.oneTimeToken.verify({
 			token
