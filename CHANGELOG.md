@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Patch Changes
+
+- 0d8d5c4: Fix `AuthClient` type incompatibility with better-auth 1.6.23. The type is now a minimal structural interface of the members the integration actually uses instead of being derived from `ReturnType<typeof createAuthClient<...>>`, whose inference collapsed the session type to `never` on better-auth 1.6.23 and rejected every concrete auth client. Backwards compatible with older better-auth versions (verified against 1.6.15).
+
 ## 0.8.1
 
 ### Patch Changes
