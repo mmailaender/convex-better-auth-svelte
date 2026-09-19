@@ -8,6 +8,8 @@ import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
 import type { GenericDataModel } from 'convex/server';
 import { _getServerToken } from 'convex-svelte/sveltekit';
 
+import { createRetryingFetch } from './retrying-fetch.js';
+
 /**
  * Initial auth state that can be passed from server to client.
  * Used to avoid loading flash on initial page render.
@@ -196,10 +198,26 @@ export const createConvexHttpClient = (
 		options?: {
 			skipConvexDeploymentUrlCheck?: boolean;
 			logger?: ConvexClientOptions['logger'];
+			/** Custom `fetch` used for every request made by the client. */
+			fetch?: typeof globalThis.fetch;
+			/**
+			 * Repeat a query request that fails with a network error or a
+			 * transient status (408, 429, 5xx), so an SSR load survives a proxy
+			 * answering 502 during a deploy. Mutations and actions are never
+			 * repeated. Defaults to `true`; pass `false` to opt out.
+			 */
+			retryTransientQueries?: boolean;
 		};
 	} = {}
 ) => {
-	const client = new ConvexHttpClient(args.convexUrl ?? PUBLIC_CONVEX_URL, args.options);
+	const { fetch: customFetch, retryTransientQueries, ...options } = args.options ?? {};
+	const baseFetch =
+		customFetch ??
+		((...fetchArgs: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...fetchArgs));
+	const client = new ConvexHttpClient(args.convexUrl ?? PUBLIC_CONVEX_URL, {
+		...options,
+		fetch: retryTransientQueries === false ? baseFetch : createRetryingFetch(baseFetch)
+	});
 	const token = args.token ?? _getServerToken();
 	if (token) client.setAuth(token);
 	return client;
