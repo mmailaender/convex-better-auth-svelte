@@ -11,6 +11,14 @@ import { isTransientStatus } from '../svelte/fetch-token.js';
 const RETRYABLE_PATHS = ['/api/query', '/api/query_ts', '/api/query_at_ts'];
 
 /**
+ * Status Convex answers with when the function itself threw (see
+ * `STATUS_CODE_UDF_FAILED` in convex/browser). The request reached the
+ * deployment and the outcome is deterministic, so a repeat would only run the
+ * failing query again and delay the error.
+ */
+const STATUS_CODE_UDF_FAILED = 560;
+
+/**
  * Pathname of a `fetch` input, which may be a string, a `URL` or a `Request`.
  * The base only exists so that a relative URL can be parsed at all; it never
  * influences the pathname.
@@ -34,7 +42,8 @@ const isQueryRequest = (input: RequestInfo | URL): boolean => {
  *
  * A proxy in front of Convex answers 502 for a second during a deploy, which
  * turns a single-attempt SSR load into a thrown error. Query requests are
- * repeated on a network error or a transient status (408, 429, 5xx); every
+ * repeated on a network error or a transient status (408, 429, 5xx except
+ * Convex's 560 for a function that threw); every
  * other request, status and error is passed through untouched. With the
  * defaults an SSR load waits about a second before it gives up and returns the
  * last response or rethrows the last error.
@@ -79,7 +88,7 @@ export const createRetryingFetch = (
 			let failure: string;
 			try {
 				const response = await baseFetch(input, init);
-				if (!isTransientStatus(response.status)) {
+				if (response.status === STATUS_CODE_UDF_FAILED || !isTransientStatus(response.status)) {
 					return response;
 				}
 				if (retries >= maxRetries) {
@@ -87,6 +96,8 @@ export const createRetryingFetch = (
 					return response;
 				}
 				failure = `status ${response.status}`;
+				// Release the connection of the response that is being discarded.
+				await response.body?.cancel().catch(() => {});
 			} catch (e) {
 				if (!isNetworkError(e) || retries >= maxRetries) {
 					throw e;

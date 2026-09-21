@@ -8,6 +8,8 @@ import { createRetryingFetch } from './retrying-fetch.js';
 // - Only /api/query, /api/query_ts and /api/query_at_ts are repeated. A lost
 //   mutation or action response does not prove the write did not commit, so
 //   those are passed through on the first outcome.
+// - Convex answers 560 when the query function itself throws. That outcome is
+//   deterministic, so it is returned at once despite being a 5xx.
 // - Transient statuses (5xx, 408, 429) and network errors are retried with
 //   backoff; every other status and error is returned or rethrown unchanged.
 // - Once the retry budget is spent, the last response is returned and the last
@@ -111,6 +113,16 @@ describe('createRetryingFetch', () => {
 		const response = await runWithTimers(retryingFetch(QUERY_URL, { method: 'POST' }));
 
 		expect(response.status).toBe(401);
+		expect(baseFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not retry a query whose function threw (560)', async () => {
+		const baseFetch = fetchWithOutcomes([status(560), ok()]);
+		const retryingFetch = createRetryingFetch(baseFetch as unknown as typeof globalThis.fetch);
+
+		const response = await runWithTimers(retryingFetch(QUERY_URL, { method: 'POST' }));
+
+		expect(response.status).toBe(560);
 		expect(baseFetch).toHaveBeenCalledTimes(1);
 	});
 
