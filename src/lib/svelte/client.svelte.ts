@@ -1,4 +1,4 @@
-import { getContext, setContext, onMount } from 'svelte';
+import { getContext, setContext, onMount, onDestroy } from 'svelte';
 
 import { setupConvex, setupAuth, setConvexClientContext, _authContextKey } from 'convex-svelte';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
@@ -35,10 +35,10 @@ type SessionState = {
  */
 export type AuthClient = {
 	$store: {
-		listen(signal: string, listener: () => void): void;
+		atoms: Record<string, { subscribe(listener: () => void): () => void }>;
 	};
 	useSession(): {
-		subscribe(listener: (state: SessionState) => void): unknown;
+		subscribe(listener: (state: SessionState) => void): () => void;
 	};
 	getSession(options?: { fetchOptions?: { headers?: Record<string, string> } }): Promise<unknown>;
 	convex: {
@@ -307,7 +307,9 @@ function createSvelteAuthClientBrowser({
 	let authOpSettledResolve: (() => void) | null = null;
 	let authOpSettledPromise: Promise<void> | null = null;
 
-	authClient.$store.listen('$sessionSignal', () => {
+	// Subscribe on the atom rather than through `$store.listen`, which discards
+	// the unsubscribe function.
+	const unsubscribeSessionSignal = authClient.$store.atoms.$sessionSignal?.subscribe(() => {
 		if (!signalInitialized) {
 			signalInitialized = true;
 			return;
@@ -320,7 +322,7 @@ function createSvelteAuthClientBrowser({
 		}
 	});
 
-	authClient.useSession().subscribe((session: SessionState) => {
+	const unsubscribeSession = authClient.useSession().subscribe((session: SessionState) => {
 		if (navigationPendingTimer) {
 			clearTimeout(navigationPendingTimer);
 			navigationPendingTimer = null;
@@ -371,6 +373,17 @@ function createSvelteAuthClientBrowser({
 
 		sessionData = session.data;
 		sessionPending = session.isPending;
+	});
+
+	// The Better Auth client is usually module-scoped and outlives this
+	// component, so its atoms would otherwise retain both listeners and the
+	// per-render state they capture.  onDestroy also runs at the end of a server
+	// render, where that means one leaked pair per request.
+	onDestroy(() => {
+		unsubscribeSessionSignal?.();
+		unsubscribeSession();
+		if (navigationPendingTimer) clearTimeout(navigationPendingTimer);
+		if (transientGuardTimer) clearTimeout(transientGuardTimer);
 	});
 
 	const logVerbose = (message: string) => {
