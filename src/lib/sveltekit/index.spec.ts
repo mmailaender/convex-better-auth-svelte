@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$env/static/public', () => ({
-	PUBLIC_CONVEX_SITE_URL: 'https://convex.example.com'
+	PUBLIC_CONVEX_SITE_URL: 'https://convex.example.com',
+	PUBLIC_CONVEX_URL: 'https://convex.example.com'
 }));
 
 vi.mock('better-auth/cookies', () => ({
@@ -22,9 +23,11 @@ vi.mock('convex-svelte/sveltekit', () => ({
 }));
 
 import { createCookieGetter } from 'better-auth/cookies';
-import { createSvelteKitHandler, getToken, getAuthState } from './index.js';
+import { ConvexHttpClient } from 'convex/browser';
+import { createConvexHttpClient, createSvelteKitHandler, getToken, getAuthState } from './index.js';
 
 const mockCreateCookieGetter = vi.mocked(createCookieGetter);
+const mockConvexHttpClient = vi.mocked(ConvexHttpClient);
 
 const mockCreateAuth = (() => ({ options: {} })) as never;
 
@@ -210,6 +213,49 @@ describe('getAuthState', () => {
 
 		// Synchronous return — AsyncLocalStorage path doesn't need await
 		expect(result).toEqual({ isAuthenticated: true });
+	});
+});
+
+describe('createConvexHttpClient', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGetServerToken.mockReturnValue(undefined);
+	});
+
+	const forwardedOptions = () => mockConvexHttpClient.mock.calls[0]?.[1];
+
+	it('wraps fetch in the retrying fetch by default', () => {
+		createConvexHttpClient();
+
+		expect(mockConvexHttpClient).toHaveBeenCalledOnce();
+		expect(typeof forwardedOptions()?.fetch).toBe('function');
+		expect(forwardedOptions()?.fetch).not.toBe(globalThis.fetch);
+	});
+
+	it('wraps a custom fetch while retries stay enabled', () => {
+		const customFetch = vi.fn() as unknown as typeof globalThis.fetch;
+
+		createConvexHttpClient({ options: { fetch: customFetch } });
+
+		expect(typeof forwardedOptions()?.fetch).toBe('function');
+		expect(forwardedOptions()?.fetch).not.toBe(customFetch);
+	});
+
+	it('forwards the custom fetch unwrapped when retryTransientQueries is false', () => {
+		const customFetch = vi.fn() as unknown as typeof globalThis.fetch;
+
+		createConvexHttpClient({ options: { fetch: customFetch, retryTransientQueries: false } });
+
+		expect(forwardedOptions()?.fetch).toBe(customFetch);
+	});
+
+	it('does not pass retryTransientQueries on to the client', () => {
+		createConvexHttpClient({
+			options: { retryTransientQueries: false, skipConvexDeploymentUrlCheck: true }
+		});
+
+		expect(forwardedOptions()).not.toHaveProperty('retryTransientQueries');
+		expect(forwardedOptions()?.skipConvexDeploymentUrlCheck).toBe(true);
 	});
 });
 

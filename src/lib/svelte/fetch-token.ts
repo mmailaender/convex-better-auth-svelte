@@ -22,7 +22,7 @@ export type ConvexTokenClient = {
  * missing status is treated as transient because it carries no evidence that
  * the session is gone.
  */
-const isTransientStatus = (status: number | undefined): boolean =>
+export const isTransientStatus = (status: number | undefined): boolean =>
 	status === undefined || status === 408 || status === 429 || status >= 500;
 
 /**
