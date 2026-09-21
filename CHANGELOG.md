@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- 4bd8a8c: Retry transient query failures in the SvelteKit `createConvexHttpClient` and forward a custom `fetch`, so an SSR load survives a proxy answering 502 for a second during a deploy. Only `/api/query`, `/api/query_ts` and `/api/query_at_ts` are repeated; a query whose function threw (Convex status 560) is returned at once, and mutations and actions are never retried, because a lost response does not prove the write did not commit, and `retryTransientQueries: false` opts out.
+
+### Patch Changes
+
+- c8a860b: Stop sending `x-forwarded-host` from `createSvelteKitHandler` to the Convex site. Convex's edge can resolve the deployment from that header, so the app's own host there made every `/api/auth/*` request die as an empty 404. The app host still travels in `x-better-auth-forwarded-host`, which `@convex-dev/better-auth` >= 0.12.0 restores before Better Auth handles the request.
+- 0b5fec8: Release the Better Auth session subscriptions that `createSvelteAuthClient` adds when its component is destroyed. With a module-scoped auth client, every server render used to leave a `$sessionSignal` and a `session` listener on the client, together with the per-render state they capture, for the lifetime of the server process.
+
 ## 0.8.2
 
 ### Patch Changes
