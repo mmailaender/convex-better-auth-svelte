@@ -44,7 +44,9 @@ const buildForwardedAuthHeaders = (headers: Headers, nextUrl: string, requestUrl
 	}
 
 	forwardedHeaders.set('host', new URL(nextUrl).host);
-	forwardedHeaders.set('x-forwarded-host', requestUrl.host);
+	// No `x-forwarded-host`: Convex's edge can resolve the deployment from it, so
+	// an app host there routes to nothing (empty 404). The component restores it
+	// from `x-better-auth-forwarded-host` before Better Auth sees the request.
 	forwardedHeaders.set('x-forwarded-proto', requestUrl.protocol.replace(/:$/, ''));
 	forwardedHeaders.set('x-better-auth-forwarded-host', requestUrl.host);
 	forwardedHeaders.set('x-better-auth-forwarded-proto', requestUrl.protocol.replace(/:$/, ''));

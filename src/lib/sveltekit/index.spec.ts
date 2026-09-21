@@ -401,7 +401,9 @@ describe('createSvelteKitHandler', () => {
 		expect(capturedRequest!.headers.get('forwarded')).toBeNull();
 		expect(capturedRequest!.headers.get('via')).toBeNull();
 		expect(capturedRequest!.headers.get('x-forwarded-for')).toBeNull();
-		expect(capturedRequest!.headers.get('x-forwarded-host')).toBe('app.example.com');
+		// Convex's edge can resolve the deployment from `x-forwarded-host`, so the
+		// app host must only travel in `x-better-auth-forwarded-host`.
+		expect(capturedRequest!.headers.get('x-forwarded-host')).toBeNull();
 		expect(capturedRequest!.headers.get('x-forwarded-proto')).toBe('https');
 		expect(capturedRequest!.headers.get('x-better-auth-forwarded-host')).toBe('app.example.com');
 		expect(capturedRequest!.headers.get('x-better-auth-forwarded-proto')).toBe('https');
