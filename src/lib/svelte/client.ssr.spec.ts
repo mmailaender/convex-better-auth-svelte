@@ -4,8 +4,8 @@ import { render } from 'svelte/server';
 import { createAuthClient } from 'better-auth/svelte';
 import { convexClient } from '@convex-dev/better-auth/client/plugins';
 
-vi.mock('$env/static/public', () => ({
-	PUBLIC_CONVEX_URL: 'https://convex.example.com'
+vi.mock('convex-svelte/sveltekit', () => ({
+	getConvexUrl: () => 'https://convex.example.com'
 }));
 
 vi.mock('$app/navigation', () => ({

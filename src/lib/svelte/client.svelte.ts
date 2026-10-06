@@ -1,12 +1,12 @@
 import { getContext, setContext, onMount, onDestroy } from 'svelte';
 
 import { setupConvex, setupAuth, setConvexClientContext, _authContextKey } from 'convex-svelte';
-import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { beforeNavigate } from '$app/navigation';
 
 import type { ConvexClient, ConvexClientOptions } from 'convex/browser';
 import isNetworkError from 'is-network-error';
 
+import { resolveConvexUrl } from '../sveltekit/convex-url.js';
 import { fetchTokenBrowser } from './fetch-token.js';
 
 /* -------------------------------------------------------------------------- */
@@ -104,6 +104,11 @@ export type InitialAuthState = {
 
 type CreateSvelteAuthClientBaseArgs = {
 	authClient: AuthClient;
+	/**
+	 * Convex deployment URL. Defaults to the URL registered with
+	 * `initConvex()` from `convex-svelte/sveltekit`. Ignored when
+	 * `convexClient` is passed.
+	 */
 	convexUrl?: string;
 	convexClient?: ConvexClient;
 	options?: ConvexClientOptions;
@@ -150,7 +155,7 @@ type CreateSvelteAuthClientExternalArgs = CreateSvelteAuthClientBaseArgs & {
  * In a standard web app, you typically call:
  *
  * ```ts
- * import { authClient } from '$lib/auth-client';
+ * import { authClient } from '#lib/auth-client.js';
  *
  * createSvelteAuthClient({
  *   authClient,
@@ -236,8 +241,7 @@ const resolveConvexClient = (
 	if (passedConvexClient) {
 		setConvexClientContext(passedConvexClient);
 	} else {
-		const url = convexUrl ?? PUBLIC_CONVEX_URL;
-		setupConvex(url, { disabled: false, ...options });
+		setupConvex(resolveConvexUrl(convexUrl), { disabled: false, ...options });
 	}
 };
 
@@ -279,7 +283,11 @@ function createSvelteAuthClientBrowser({
 	// when the session is not yet established, giving the atom time to settle.
 	let navigationPendingTimer: ReturnType<typeof setTimeout> | null = null;
 
-	beforeNavigate(({ willUnload }) => {
+	beforeNavigate(({ willUnload, shallow }) => {
+		// Shallow routing (SvelteKit 3) keeps the current page, so there is no
+		// page content to guard. `shallow` is undefined on SvelteKit 2.
+		if (shallow) return;
+
 		if (!willUnload && !sessionData) {
 			sessionPending = true;
 			if (navigationPendingTimer) clearTimeout(navigationPendingTimer);

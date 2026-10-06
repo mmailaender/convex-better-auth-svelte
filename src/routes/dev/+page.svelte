@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client.js';
-	import { api } from '$convex/_generated/api.js';
+	import { authClient } from '#lib/auth-client.js';
+	import { api } from '#convex/_generated/api.js';
 	import { useQuery } from 'convex-svelte';
-	import { useAuth } from '$lib/svelte/index.js';
+	import { useAuth } from '#lib/svelte/index.js';
 
 	let { data } = $props();
 
