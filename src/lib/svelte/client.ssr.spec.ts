@@ -4,8 +4,8 @@ import { render } from 'svelte/server';
 import { createAuthClient } from 'better-auth/svelte';
 import { convexClient } from '@convex-dev/better-auth/client/plugins';
 
-vi.mock('$env/static/public', () => ({
-	PUBLIC_CONVEX_URL: 'https://convex.example.com'
+vi.mock('convex-svelte/sveltekit', () => ({
+	getConvexUrl: () => 'https://convex.example.com'
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -19,6 +19,7 @@ vi.mock('convex-svelte', () => ({
 	_authContextKey: Symbol('auth')
 }));
 
+import { setupConvex } from 'convex-svelte';
 import ClientSsrHarness from './ClientSsrHarness.spec.svelte';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,18 @@ import ClientSsrHarness from './ClientSsrHarness.spec.svelte';
 describe('createSvelteAuthClient during SSR', () => {
 	afterEach(() => {
 		vi.useRealTimers();
+	});
+
+	it('sets up Convex with the URL registered by initConvex()', () => {
+		const authClient = createAuthClient({
+			baseURL: 'https://app.example.com',
+			plugins: [convexClient()]
+		});
+		vi.mocked(setupConvex).mockClear();
+
+		void render(ClientSsrHarness, { props: { authClient } }).body;
+
+		expect(vi.mocked(setupConvex).mock.calls[0]?.[0]).toBe('https://convex.example.com');
 	});
 
 	it('releases its Better Auth subscriptions when the render completes', () => {

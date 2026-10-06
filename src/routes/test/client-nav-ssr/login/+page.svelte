@@ -8,8 +8,8 @@
 	 * After sign-in + goto(), the stale hasServerAuth=false causes the flash.
 	 */
 	import { goto } from '$app/navigation';
-	import { useAuth } from '$lib/svelte/index.js';
-	import { authClient } from '$lib/auth-client.js';
+	import { useAuth } from '#lib/svelte/index.js';
+	import { authClient } from '#lib/auth-client.js';
 
 	const auth = useAuth();
 

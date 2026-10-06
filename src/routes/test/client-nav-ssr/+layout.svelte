@@ -7,8 +7,8 @@
 	 * the pending session falls back to stale hasServerAuth=false,
 	 * producing isAuthenticated=false, isLoading=false (the flash).
 	 */
-	import { createSvelteAuthClient } from '$lib/svelte/index.js';
-	import { authClient } from '$lib/auth-client.js';
+	import { createSvelteAuthClient } from '#lib/svelte/index.js';
+	import { authClient } from '#lib/auth-client.js';
 
 	let { children, data } = $props();
 
