@@ -6,7 +6,8 @@ vi.mock('$env/static/public', () => ({
 }));
 
 vi.mock('better-auth/cookies', () => ({
-	createCookieGetter: vi.fn()
+	createCookieGetter: vi.fn(),
+	SECURE_COOKIE_PREFIX: '__Secure-'
 }));
 
 vi.mock('@convex-dev/better-auth/plugins', () => ({
@@ -145,6 +146,55 @@ describe('getToken', () => {
 
 		expect(token).toBe('proxy-token');
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
+	});
+
+	it('reads a custom-prefixed insecure cookie when a getter is passed', () => {
+		const cookieGetter = (cookieName: string) => ({ name: `custom-prefix.${cookieName}` });
+
+		const token = getToken(
+			mockCookies({ 'custom-prefix.convex_jwt': 'custom-token' }),
+			cookieGetter
+		);
+
+		expect(token).toBe('custom-token');
+	});
+
+	it('reads the secure variant resolved by a custom getter', () => {
+		const cookieGetter = () => ({ name: '__Secure-custom-prefix.convex_jwt' });
+
+		const token = getToken(
+			mockCookies({ '__Secure-custom-prefix.convex_jwt': 'secure-custom-token' }),
+			cookieGetter
+		);
+
+		expect(token).toBe('secure-custom-token');
+	});
+
+	it('falls back to the insecure variant when the resolved secure cookie is missing', () => {
+		const cookieGetter = () => ({ name: '__Secure-custom-prefix.convex_jwt' });
+
+		const token = getToken(
+			mockCookies({ 'custom-prefix.convex_jwt': 'fallback-token' }),
+			cookieGetter
+		);
+
+		expect(token).toBe('fallback-token');
+	});
+
+	it('supports fully custom names beyond prefixes', () => {
+		const cookieGetter = () => ({ name: 'entirely-custom-name' });
+
+		const token = getToken(mockCookies({ 'entirely-custom-name': 'custom-token' }), cookieGetter);
+
+		expect(token).toBe('custom-token');
+	});
+
+	it('returns undefined when neither resolved variant exists', () => {
+		const cookieGetter = () => ({ name: 'custom-prefix.convex_jwt' });
+
+		const token = getToken(mockCookies({}), cookieGetter);
+
+		expect(token).toBeUndefined();
 	});
 });
 

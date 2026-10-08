@@ -1,4 +1,4 @@
-import { createCookieGetter } from 'better-auth/cookies';
+import { createCookieGetter, SECURE_COOKIE_PREFIX } from 'better-auth/cookies';
 import type { BetterAuthOptions } from 'better-auth';
 import type { Cookies, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
@@ -20,7 +20,7 @@ export type InitialAuthState = {
 
 const DEFAULT_CONVEX_JWT_COOKIE_NAME = `better-auth.${JWT_COOKIE_NAME}`;
 const DEFAULT_CONVEX_JWT_COOKIE_NAMES = [
-	`__Secure-${DEFAULT_CONVEX_JWT_COOKIE_NAME}`,
+	`${SECURE_COOKIE_PREFIX}${DEFAULT_CONVEX_JWT_COOKIE_NAME}`,
 	DEFAULT_CONVEX_JWT_COOKIE_NAME
 ] as const;
 const FORWARDED_AUTH_HEADER_NAMES = new Set([
@@ -63,6 +63,26 @@ const getTokenFromKnownCookieNames = (cookies: Cookies, cookieNames: readonly st
 	return undefined;
 };
 
+/**
+ * Resolves a cookie name, as returned by better-auth's `createCookieGetter`.
+ * Pass it to {@link getToken} so custom cookie setups (prefixes, full name
+ * overrides) keep working during SvelteKit SSR without instantiating
+ * `createAuth()`.
+ */
+export type CookieGetter = (cookieName: string) => { name: string };
+
+const resolveConvexJwtCookieNames = (cookieGetter?: CookieGetter): readonly string[] => {
+	if (!cookieGetter) return DEFAULT_CONVEX_JWT_COOKIE_NAMES;
+	const name = cookieGetter(JWT_COOKIE_NAME).name;
+	const alt = name.startsWith(SECURE_COOKIE_PREFIX)
+		? name.replace(SECURE_COOKIE_PREFIX, '')
+		: `${SECURE_COOKIE_PREFIX}${name}`;
+	return [name, alt];
+};
+
+const isCookiesLike = (value: unknown): value is Cookies =>
+	typeof (value as Cookies | undefined)?.get === 'function';
+
 const normalizeCookieOptions = (options: ReturnType<CreateAuth<GenericDataModel>>['options']) =>
 	({
 		...options,
@@ -71,7 +91,7 @@ const normalizeCookieOptions = (options: ReturnType<CreateAuth<GenericDataModel>
 			: options.trustedOrigins
 	}) as BetterAuthOptions;
 
-export function getToken(cookies: Cookies): string | undefined;
+export function getToken(cookies: Cookies, cookieGetter?: CookieGetter): string | undefined;
 /**
  * @deprecated Pass `cookies` directly instead: `getToken(cookies)`.
  * This overload instantiates `createAuth()` during SvelteKit SSR, which can
@@ -84,27 +104,29 @@ export function getToken<DataModel extends GenericDataModel>(
 ): Promise<string | undefined>;
 export function getToken<DataModel extends GenericDataModel>(
 	createAuthOrCookies: CreateAuth<DataModel> | Cookies,
-	maybeCookies?: Cookies
+	maybeCookiesOrGetter?: Cookies | CookieGetter
 ): string | undefined | Promise<string | undefined> {
-	if (!maybeCookies) {
+	if (!maybeCookiesOrGetter || !isCookiesLike(maybeCookiesOrGetter)) {
 		return getTokenFromKnownCookieNames(
 			createAuthOrCookies as Cookies,
-			DEFAULT_CONVEX_JWT_COOKIE_NAMES
+			resolveConvexJwtCookieNames(maybeCookiesOrGetter as CookieGetter | undefined)
 		);
 	}
 
 	return Promise.resolve().then(() => {
 		const createAuth = createAuthOrCookies as CreateAuth<DataModel>;
-		const cookies = maybeCookies;
+		const cookies = maybeCookiesOrGetter as Cookies;
 		const options = createAuth({} as GenericCtx<DataModel>).options;
-		const createCookie = createCookieGetter(normalizeCookieOptions(options));
-		const cookie = createCookie(JWT_COOKIE_NAME);
+		const cookieGetter = createCookieGetter(normalizeCookieOptions(options));
+		const cookie = cookieGetter(JWT_COOKIE_NAME);
 		const token = cookies.get(cookie.name);
 
 		if (!token) {
-			const isSecure = cookie.name.startsWith('__Secure-');
-			const insecureCookieName = cookie.name.replace('__Secure-', '');
-			const secureCookieName = isSecure ? cookie.name : `__Secure-${insecureCookieName}`;
+			const isSecure = cookie.name.startsWith(SECURE_COOKIE_PREFIX);
+			const insecureCookieName = cookie.name.replace(SECURE_COOKIE_PREFIX, '');
+			const secureCookieName = isSecure
+				? cookie.name
+				: `${SECURE_COOKIE_PREFIX}${insecureCookieName}`;
 
 			const insecureValue = cookies.get(insecureCookieName);
 			const secureValue = cookies.get(secureCookieName);
