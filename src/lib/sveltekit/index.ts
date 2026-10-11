@@ -2,12 +2,12 @@ import { createCookieGetter } from 'better-auth/cookies';
 import type { BetterAuthOptions } from 'better-auth';
 import type { Cookies, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
-import { PUBLIC_CONVEX_SITE_URL, PUBLIC_CONVEX_URL } from '$env/static/public';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
 import type { GenericDataModel } from 'convex/server';
 import { _getServerToken } from 'convex-svelte/sveltekit';
 
+import { resolveConvexSiteUrl, resolveConvexUrl } from './convex-url.js';
 import { createRetryingFetch } from './retrying-fetch.js';
 
 /**
@@ -196,6 +196,10 @@ export function getAuthState<DataModel extends GenericDataModel>(
 export const createConvexHttpClient = (
 	args: {
 		token?: string;
+		/**
+		 * Convex deployment URL. Defaults to the URL registered with
+		 * `initConvex()` from `convex-svelte/sveltekit`.
+		 */
 		convexUrl?: string;
 		options?: {
 			skipConvexDeploymentUrlCheck?: boolean;
@@ -216,7 +220,7 @@ export const createConvexHttpClient = (
 	const baseFetch =
 		customFetch ??
 		((...fetchArgs: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...fetchArgs));
-	const client = new ConvexHttpClient(args.convexUrl ?? PUBLIC_CONVEX_URL, {
+	const client = new ConvexHttpClient(resolveConvexUrl(args.convexUrl), {
 		...options,
 		fetch: retryTransientQueries === false ? baseFetch : createRetryingFetch(baseFetch)
 	});
@@ -227,12 +231,7 @@ export const createConvexHttpClient = (
 
 const handler = (request: Request, opts?: { convexSiteUrl?: string }) => {
 	const requestUrl = new URL(request.url);
-	const convexSiteUrl = opts?.convexSiteUrl ?? PUBLIC_CONVEX_SITE_URL;
-
-	if (!convexSiteUrl) {
-		throw new Error('PUBLIC_CONVEX_SITE_URL environment variable is not set');
-	}
-
+	const convexSiteUrl = resolveConvexSiteUrl(opts?.convexSiteUrl);
 	const nextUrl = `${convexSiteUrl}${requestUrl.pathname}${requestUrl.search}`;
 	const newRequest = new Request(nextUrl, request);
 	const forwardedHeaders = buildForwardedAuthHeaders(request.headers, nextUrl, requestUrl);
@@ -247,7 +246,15 @@ const handler = (request: Request, opts?: { convexSiteUrl?: string }) => {
 	return fetch(newRequest, { method: request.method, redirect: 'manual' });
 };
 
-export const createSvelteKitHandler = (opts?: { convexSiteUrl?: string }) => {
+export const createSvelteKitHandler = (opts?: {
+	/**
+	 * Convex HTTP actions URL (`https://<deployment>.convex.site`). Defaults to
+	 * the `*.convex.site` URL derived from the Convex Cloud URL registered with
+	 * `initConvex()`. Required for local, self-hosted and custom-domain
+	 * deployments.
+	 */
+	convexSiteUrl?: string;
+}) => {
 	const requestHandler: RequestHandler = async ({ request }) => {
 		return handler(request, opts);
 	};

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useAuth } from '$lib/svelte/index.js';
+	import { useAuth } from '#lib/svelte/index.js';
 
 	let { data } = $props();
 

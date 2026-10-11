@@ -48,6 +48,7 @@ for example, experimental onboarding flows or a custom multi-tenant model.
 - Svelte-friendly API for Convex Better Auth
 - Zero lock-in — your Convex, your data, your UI
 - Works standalone or with ready-to-ship components
+- Supports SvelteKit 3 and SvelteKit 2
 - Type-safe end-to-end integration via Convex
 
 ---

@@ -4,8 +4,8 @@
 	 * Signs in and does a client-side goto('/test/client-nav/dashboard')
 	 */
 	import { goto } from '$app/navigation';
-	import { useAuth } from '$lib/svelte/index.js';
-	import { authClient } from '$lib/auth-client.js';
+	import { useAuth } from '#lib/svelte/index.js';
+	import { authClient } from '#lib/auth-client.js';
 
 	const auth = useAuth();
 

@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('$env/static/public', () => ({
-	PUBLIC_CONVEX_SITE_URL: 'https://convex.example.com',
-	PUBLIC_CONVEX_URL: 'https://convex.example.com'
-}));
-
 vi.mock('better-auth/cookies', () => ({
 	createCookieGetter: vi.fn()
 }));
@@ -18,8 +13,10 @@ vi.mock('convex/browser', () => ({
 }));
 
 const mockGetServerToken = vi.fn<() => string | undefined>(() => undefined);
+const mockGetConvexUrl = vi.fn<() => string>(() => 'https://happy-animal-123.convex.cloud');
 vi.mock('convex-svelte/sveltekit', () => ({
-	_getServerToken: (...args: unknown[]) => mockGetServerToken(...(args as []))
+	_getServerToken: (...args: unknown[]) => mockGetServerToken(...(args as [])),
+	getConvexUrl: () => mockGetConvexUrl()
 }));
 
 import { createCookieGetter } from 'better-auth/cookies';
@@ -249,6 +246,18 @@ describe('createConvexHttpClient', () => {
 		expect(forwardedOptions()?.fetch).toBe(customFetch);
 	});
 
+	it('uses the URL registered with initConvex() when convexUrl is omitted', () => {
+		createConvexHttpClient();
+
+		expect(mockConvexHttpClient.mock.calls[0]?.[0]).toBe('https://happy-animal-123.convex.cloud');
+	});
+
+	it('prefers an explicit convexUrl over the initConvex() URL', () => {
+		createConvexHttpClient({ convexUrl: 'http://127.0.0.1:3210' });
+
+		expect(mockConvexHttpClient.mock.calls[0]?.[0]).toBe('http://127.0.0.1:3210');
+	});
+
 	it('does not pass retryTransientQueries on to the client', () => {
 		createConvexHttpClient({
 			options: { retryTransientQueries: false, skipConvexDeploymentUrlCheck: true }
@@ -264,6 +273,7 @@ describe('createSvelteKitHandler', () => {
 
 	beforeEach(() => {
 		capturedRequest = undefined;
+		mockGetConvexUrl.mockReturnValue('https://happy-animal-123.convex.cloud');
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async (input: Request) => {
@@ -273,8 +283,30 @@ describe('createSvelteKitHandler', () => {
 		);
 	});
 
-	it('should set host header to target convex URL, not the original request host', async () => {
+	it('derives the convex.site URL from the initConvex() URL when convexSiteUrl is omitted', async () => {
 		const { GET } = createSvelteKitHandler();
+
+		await GET({
+			request: new Request('https://app.example.com/api/auth/get-session')
+		} as Parameters<typeof GET>[0]);
+
+		expect(capturedRequest!.url).toBe('https://happy-animal-123.convex.site/api/auth/get-session');
+	});
+
+	it('rejects with a hint to pass convexSiteUrl when the URL cannot be derived', async () => {
+		mockGetConvexUrl.mockReturnValue('http://127.0.0.1:3210');
+		const { GET } = createSvelteKitHandler();
+
+		await expect(
+			GET({
+				request: new Request('https://app.example.com/api/auth/get-session')
+			} as Parameters<typeof GET>[0])
+		).rejects.toThrow(/Pass `convexSiteUrl`/);
+		expect(capturedRequest).toBeUndefined();
+	});
+
+	it('should set host header to target convex URL, not the original request host', async () => {
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: { host: 'app.example.com' }
@@ -287,7 +319,7 @@ describe('createSvelteKitHandler', () => {
 	});
 
 	it('should proxy to the correct URL with path and query params', async () => {
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/callback?code=abc123', {
 			headers: { host: 'app.example.com' }
@@ -300,7 +332,7 @@ describe('createSvelteKitHandler', () => {
 	});
 
 	it('should not forward Cloudflare edge headers to the upstream request', async () => {
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: {
@@ -331,7 +363,7 @@ describe('createSvelteKitHandler', () => {
 			})
 		);
 
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: {
 				host: 'app.example.com',
@@ -347,7 +379,7 @@ describe('createSvelteKitHandler', () => {
 	});
 
 	it('should forward only the auth headers needed by Better Auth', async () => {
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: {
@@ -380,7 +412,7 @@ describe('createSvelteKitHandler', () => {
 	});
 
 	it('should derive trusted forwarded host headers from the external request URL', async () => {
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: {
@@ -411,7 +443,7 @@ describe('createSvelteKitHandler', () => {
 		expect(capturedRequest!.headers.get('x-real-ip')).toBeNull();
 	});
 	it('should strip headers named by the Connection header', async () => {
-		const { GET } = createSvelteKitHandler();
+		const { GET } = createSvelteKitHandler({ convexSiteUrl: 'https://convex.example.com' });
 
 		const incomingRequest = new Request('https://app.example.com/api/auth/get-session', {
 			headers: {

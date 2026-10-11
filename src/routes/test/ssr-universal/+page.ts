@@ -7,7 +7,7 @@
  * navigation.
  */
 import { convexLoad } from 'convex-svelte/sveltekit';
-import { api } from '$convex/_generated/api.js';
+import { api } from '#convex/_generated/api.js';
 
 export const load = async () => {
 	let currentUser = null;

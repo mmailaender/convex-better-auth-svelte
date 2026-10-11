@@ -7,7 +7,9 @@ declare global {
 			token: string | undefined;
 		}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			panel?: string;
+		}
 		// interface Platform {}
 	}
 }
