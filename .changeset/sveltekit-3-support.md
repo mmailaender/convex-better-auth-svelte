@@ -19,4 +19,4 @@ export const { GET, POST } = createSvelteKitHandler({ convexSiteUrl: PUBLIC_CONV
 
 Local (`convex dev --local`), self-hosted and custom-domain deployments always need `convexSiteUrl`, because their site URL can't be derived.
 
-`@sveltejs/kit` is now a declared peer dependency (`^2.0.0 || ^3.0.0`).
+`@sveltejs/kit` is now a declared peer dependency (`^2.12.0 || ^3.0.0`). 2.12 is the oldest SvelteKit 2 release this was verified against, and the first with `$app/state`, which `convex-svelte/sveltekit` is starting to use.
