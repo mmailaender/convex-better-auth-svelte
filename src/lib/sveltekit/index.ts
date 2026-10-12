@@ -18,11 +18,28 @@ export type InitialAuthState = {
 	isAuthenticated: boolean;
 };
 
-const DEFAULT_CONVEX_JWT_COOKIE_NAME = `better-auth.${JWT_COOKIE_NAME}`;
-const DEFAULT_CONVEX_JWT_COOKIE_NAMES = [
-	`__Secure-${DEFAULT_CONVEX_JWT_COOKIE_NAME}`,
-	DEFAULT_CONVEX_JWT_COOKIE_NAME
-] as const;
+/**
+ * Options for the cookie-only {@link getToken} overload.
+ */
+export type GetTokenOptions = {
+	/**
+	 * Better Auth's `advanced.cookiePrefix`, if your auth config sets one.
+	 * Matches the `cookiePrefix` option of `@convex-dev/better-auth`'s `getToken`.
+	 * @default 'better-auth'
+	 */
+	cookiePrefix?: string;
+};
+
+/**
+ * Candidate names of the Convex JWT cookie, in the order Better Auth's
+ * `getSessionCookie()` checks them: `.` before `-` as separator, and the
+ * `__Secure-` variant before the plain one.
+ */
+const getConvexJwtCookieNames = (cookiePrefix = 'better-auth') =>
+	['.', '-'].flatMap((separator) => {
+		const name = `${cookiePrefix}${separator}${JWT_COOKIE_NAME}`;
+		return [`__Secure-${name}`, name];
+	});
 const FORWARDED_AUTH_HEADER_NAMES = new Set([
 	'accept',
 	'authorization',
@@ -71,7 +88,7 @@ const normalizeCookieOptions = (options: ReturnType<CreateAuth<GenericDataModel>
 			: options.trustedOrigins
 	}) as BetterAuthOptions;
 
-export function getToken(cookies: Cookies): string | undefined;
+export function getToken(cookies: Cookies, options?: GetTokenOptions): string | undefined;
 /**
  * @deprecated Pass `cookies` directly instead: `getToken(cookies)`.
  * This overload instantiates `createAuth()` during SvelteKit SSR, which can
@@ -84,18 +101,18 @@ export function getToken<DataModel extends GenericDataModel>(
 ): Promise<string | undefined>;
 export function getToken<DataModel extends GenericDataModel>(
 	createAuthOrCookies: CreateAuth<DataModel> | Cookies,
-	maybeCookies?: Cookies
+	cookiesOrOptions?: Cookies | GetTokenOptions
 ): string | undefined | Promise<string | undefined> {
-	if (!maybeCookies) {
+	if (typeof createAuthOrCookies !== 'function') {
 		return getTokenFromKnownCookieNames(
-			createAuthOrCookies as Cookies,
-			DEFAULT_CONVEX_JWT_COOKIE_NAMES
+			createAuthOrCookies,
+			getConvexJwtCookieNames((cookiesOrOptions as GetTokenOptions | undefined)?.cookiePrefix)
 		);
 	}
 
 	return Promise.resolve().then(() => {
-		const createAuth = createAuthOrCookies as CreateAuth<DataModel>;
-		const cookies = maybeCookies;
+		const createAuth = createAuthOrCookies;
+		const cookies = cookiesOrOptions as Cookies;
 		const options = createAuth({} as GenericCtx<DataModel>).options;
 		const createCookie = createCookieGetter(normalizeCookieOptions(options));
 		const cookie = createCookie(JWT_COOKIE_NAME);
