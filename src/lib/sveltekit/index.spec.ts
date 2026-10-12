@@ -52,6 +52,32 @@ describe('getToken', () => {
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
 	});
 
+	it('reads a cookie with a custom cookiePrefix', () => {
+		expect(getToken(mockCookies({ 'myapp.convex_jwt': 'custom' }), { cookiePrefix: 'myapp' })).toBe(
+			'custom'
+		);
+		expect(
+			getToken(mockCookies({ '__Secure-myapp.convex_jwt': 'secure-custom' }), {
+				cookiePrefix: 'myapp'
+			})
+		).toBe('secure-custom');
+		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
+	});
+
+	it('ignores default-named cookies when a custom cookiePrefix is set', () => {
+		const token = getToken(mockCookies({ 'better-auth.convex_jwt': 'default' }), {
+			cookiePrefix: 'myapp'
+		});
+
+		expect(token).toBeUndefined();
+	});
+
+	it('also accepts the dash separator, like Better Auth', () => {
+		expect(getToken(mockCookies({ 'myapp-convex_jwt': 'dash' }), { cookiePrefix: 'myapp' })).toBe(
+			'dash'
+		);
+	});
+
 	it('returns the token when primary cookie name matches', async () => {
 		mockCreateCookieGetter.mockReturnValue(
 			() =>
