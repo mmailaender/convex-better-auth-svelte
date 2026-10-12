@@ -241,7 +241,7 @@ const resolveConvexClient = (
 	if (passedConvexClient) {
 		setConvexClientContext(passedConvexClient);
 	} else {
-		setupConvex(resolveConvexUrl(convexUrl), { disabled: false, ...options });
+		setupConvex(resolveConvexUrl(convexUrl), options);
 	}
 };
 
