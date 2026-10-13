@@ -52,6 +52,9 @@ jobs:
           PUBLIC_CONVEX_URL: ${{ vars.PUBLIC_CONVEX_URL }}
           PUBLIC_CONVEX_SITE_URL: ${{ vars.PUBLIC_CONVEX_SITE_URL }}
 
+      - name: Bundling check
+        run: pnpm test:bundling
+
       - name: Check
         run: pnpm check
         env:

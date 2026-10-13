@@ -31,6 +31,7 @@
 		"test:unit": "vitest run",
 		"test:e2e": "playwright test",
 		"test:e2e:ui": "playwright test --ui",
+		"test:bundling": "node tests/bundling/run.mjs",
 		"test": "pnpm test:unit && pnpm test:e2e",
 		"setup:test-user": "npx tsx scripts/setup-test-user.ts",
 		"changeset": "changeset",
