@@ -111,6 +111,11 @@ type CreateSvelteAuthClientBaseArgs = {
 	 */
 	convexUrl?: string;
 	convexClient?: ConvexClient;
+	/**
+	 * Options for the `ConvexClient` this creates. Ignored when `convexClient`
+	 * is passed, or when `initConvex()` from `convex-svelte/sveltekit` already
+	 * created the client: pass them to `initConvex()` instead.
+	 */
 	options?: ConvexClientOptions;
 	/**
 	 * Optional getter for server-side auth state.
