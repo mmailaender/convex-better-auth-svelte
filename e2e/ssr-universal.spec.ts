@@ -72,6 +72,30 @@ test.describe('SSR Universal Load — Authenticated', () => {
 	});
 });
 
+test.describe('SSR Universal Load — hydration', () => {
+	test('hydration reuses the server result instead of querying again', async ({ page }) => {
+		const endpointRequests: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().includes('/__convex-svelte/q/')) endpointRequests.push(request.url());
+		});
+
+		const html = await (await page.goto('/test/ssr-universal'))!.text();
+		// Session invalidated by the concurrent sign-out test: nothing to hydrate.
+		if (!html.includes('data-testid="universal-user-email"')) {
+			test.skip();
+			return;
+		}
+
+		// convexLoadHydration served the query, and SvelteKit recorded the response.
+		expect(html).toMatch(/data-sveltekit-fetched data-url="[^"]*\/__convex-svelte\/q\//);
+
+		// The browser replays it: the user stays visible, and no endpoint request is made.
+		await page.waitForLoadState('networkidle');
+		await expect(page.locator('[data-testid="universal-user-email"]')).toBeVisible();
+		expect(endpointRequests).toEqual([]);
+	});
+});
+
 test.describe('SSR Universal Load — Unauthenticated', () => {
 	test.use({ storageState: { cookies: [], origins: [] } });
 
