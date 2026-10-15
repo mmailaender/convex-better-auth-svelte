@@ -88,7 +88,7 @@
 		"better-auth": "1.6.23",
 		"concurrently": "^10.0.3",
 		"convex": "1.42.1",
-		"convex-svelte": "^0.14.0",
+		"convex-svelte": "^0.15.1",
 		"dotenv": "^17.4.2",
 		"eslint": "^10.6.0",
 		"eslint-config-prettier": "^10.1.8",
