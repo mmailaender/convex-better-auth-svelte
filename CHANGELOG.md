@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- 2874003: Support SvelteKit 3 (and keep supporting SvelteKit 2). Fixes #47.
+
+  The package no longer imports `$env/static/public`, which SvelteKit 3 deprecates and which fails the build there unless the app declares the variables in `src/env.ts`. The Convex URLs are now resolved like this:
+
+  - `createSvelteAuthClient` and `createConvexHttpClient`: an explicit `convexUrl`, otherwise the URL registered with `initConvex()` from `convex-svelte/sveltekit`.
+  - `createSvelteKitHandler`: an explicit `convexSiteUrl`, otherwise the `*.convex.site` URL derived from the `*.convex.cloud` URL registered with `initConvex()`.
+
+  **Breaking:** `PUBLIC_CONVEX_URL` and `PUBLIC_CONVEX_SITE_URL` are no longer read implicitly. If you relied on that, either call `initConvex(PUBLIC_CONVEX_URL)` in `src/hooks.ts` (as the SSR setup in the SvelteKit guide already does), or pass the URLs explicitly:
+
+  ```ts
+  // src/routes/api/auth/[...all]/+server.ts
+  import { PUBLIC_CONVEX_SITE_URL } from '$app/env/public'; // SvelteKit 2: '$env/static/public'
+  export const { GET, POST } = createSvelteKitHandler({ convexSiteUrl: PUBLIC_CONVEX_SITE_URL });
+  ```
+
+  Local (`convex dev --local`), self-hosted and custom-domain deployments always need `convexSiteUrl`, because their site URL can't be derived.
+
+  `@sveltejs/kit` is now a declared peer dependency (`^2.12.0 || ^3.0.0`). 2.12 is the oldest SvelteKit 2 release this was verified against, and the first with `$app/state`, which `convex-svelte/sveltekit` is starting to use.
+
+### Patch Changes
+
+- e7e7388: `getToken(cookies)` now finds the Convex JWT cookie when Better Auth uses a custom `advanced.cookiePrefix`. Pass the prefix as an option, like the `cookiePrefix` option of `@convex-dev/better-auth`'s `getToken`:
+
+  ```ts
+  // src/hooks.server.ts
+  const token = getToken(event.cookies, { cookiePrefix: 'myapp' });
+  ```
+
+  Without it, SSR treated every user as signed out on apps with a custom prefix. The cookie lookup now follows Better Auth's `getSessionCookie()`, which also accepts a `-` separator (`better-auth-convex_jwt`).
+
+- 03b4283: `createSvelteAuthClient` no longer forces the Convex client on. In apps without `initConvex()` it used to pass `disabled: false` to `setupConvex`, so the client it created during server rendering opened a WebSocket on the server that stayed open as long as the process. convex-svelte now decides on its own: disabled on the server, enabled in the browser.
+
 ## 0.9.0
 
 ### Minor Changes
