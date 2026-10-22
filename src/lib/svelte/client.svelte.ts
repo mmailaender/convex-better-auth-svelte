@@ -204,6 +204,9 @@ type CreateSvelteAuthClientExternalArgs = CreateSvelteAuthClientBaseArgs & {
  *   from the auth-provider viewpoint,
  * - and still manages `convexClient.setAuth` / `clearAuth` and the combined
  *   `isLoading` / `isAuthenticated` state.
+ *
+ * A server that renders with the Convex JWT cookie this sets reads it with
+ * `getToken(cookies, { sessionCookie: false })`: there is no Better Auth session cookie.
  */
 export function createSvelteAuthClient({
 	authClient,
