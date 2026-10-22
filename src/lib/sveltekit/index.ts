@@ -28,6 +28,13 @@ export type GetTokenOptions = {
 	 * @default 'better-auth'
 	 */
 	cookiePrefix?: string;
+	/**
+	 * Name of Better Auth's session cookie without prefix, if your auth config renames it
+	 * (`advanced.cookies.session_token.name`). The token is only returned while this cookie
+	 * is present.
+	 * @default 'session_token'
+	 */
+	sessionCookieName?: string;
 };
 
 /**
@@ -35,11 +42,22 @@ export type GetTokenOptions = {
  * `getSessionCookie()` checks them: `.` before `-` as separator, and the
  * `__Secure-` variant before the plain one.
  */
-const getConvexJwtCookieNames = (cookiePrefix = 'better-auth') =>
+const getCookieNames = (cookieName: string, cookiePrefix = 'better-auth') =>
 	['.', '-'].flatMap((separator) => {
-		const name = `${cookiePrefix}${separator}${JWT_COOKIE_NAME}`;
+		const name = `${cookiePrefix}${separator}${cookieName}`;
 		return [`__Secure-${name}`, name];
 	});
+const getConvexJwtCookieNames = (cookiePrefix?: string) =>
+	getCookieNames(JWT_COOKIE_NAME, cookiePrefix);
+
+/**
+ * The Convex JWT cookie is a cache of the session's token, not a session of its own: a
+ * `/convex/token` answer that left the server before a sign-out and reached the browser
+ * after it sets the cookie again, and the JWT stays valid until it expires (15 minutes by
+ * default). Without the session cookie, the request is signed out.
+ */
+const hasSessionCookie = (cookies: Cookies, sessionCookieNames: readonly string[]) =>
+	sessionCookieNames.some((name) => !!cookies.get(name));
 const FORWARDED_AUTH_HEADER_NAMES = new Set([
 	'accept',
 	'authorization',
@@ -104,9 +122,15 @@ export function getToken<DataModel extends GenericDataModel>(
 	cookiesOrOptions?: Cookies | GetTokenOptions
 ): string | undefined | Promise<string | undefined> {
 	if (typeof createAuthOrCookies !== 'function') {
+		const options = cookiesOrOptions as GetTokenOptions | undefined;
+		const sessionCookieNames = getCookieNames(
+			options?.sessionCookieName ?? 'session_token',
+			options?.cookiePrefix
+		);
+		if (!hasSessionCookie(createAuthOrCookies, sessionCookieNames)) return undefined;
 		return getTokenFromKnownCookieNames(
 			createAuthOrCookies,
-			getConvexJwtCookieNames((cookiesOrOptions as GetTokenOptions | undefined)?.cookiePrefix)
+			getConvexJwtCookieNames(options?.cookiePrefix)
 		);
 	}
 
@@ -115,6 +139,8 @@ export function getToken<DataModel extends GenericDataModel>(
 		const cookies = cookiesOrOptions as Cookies;
 		const options = createAuth({} as GenericCtx<DataModel>).options;
 		const createCookie = createCookieGetter(normalizeCookieOptions(options));
+		const sessionCookie = createCookie('session_token').name.replace(/^__Secure-/, '');
+		if (!hasSessionCookie(cookies, [`__Secure-${sessionCookie}`, sessionCookie])) return undefined;
 		const cookie = createCookie(JWT_COOKIE_NAME);
 		const token = cookies.get(cookie.name);
 

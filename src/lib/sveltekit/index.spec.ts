@@ -28,6 +28,12 @@ const mockConvexHttpClient = vi.mocked(ConvexHttpClient);
 
 const mockCreateAuth = (() => ({ options: {} })) as never;
 
+/** A cookie getter whose names follow Better Auth's: `<prefix>.<cookie>`, optionally `__Secure-`. */
+const cookieGetter = (prefix: string) =>
+	((name: string) => ({ name: `${prefix}.${name}`, attributes: {} })) as ReturnType<
+		typeof createCookieGetter
+	>;
+
 const mockCookies = (map: Record<string, string>) =>
 	({
 		get: (name: string) => map[name]
@@ -39,74 +45,87 @@ describe('getToken', () => {
 	});
 
 	it('reads the default insecure cookie without instantiating createAuth', () => {
-		const token = getToken(mockCookies({ 'better-auth.convex_jwt': 'my-token' }));
+		const token = getToken(
+			mockCookies({ 'better-auth.session_token': 's', 'better-auth.convex_jwt': 'my-token' })
+		);
 
 		expect(token).toBe('my-token');
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
 	});
 
 	it('reads the default secure cookie without instantiating createAuth', () => {
-		const token = getToken(mockCookies({ '__Secure-better-auth.convex_jwt': 'secure-token' }));
+		const token = getToken(
+			mockCookies({
+				'__Secure-better-auth.session_token': 's',
+				'__Secure-better-auth.convex_jwt': 'secure-token'
+			})
+		);
 
 		expect(token).toBe('secure-token');
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
 	});
 
 	it('reads a cookie with a custom cookiePrefix', () => {
-		expect(getToken(mockCookies({ 'myapp.convex_jwt': 'custom' }), { cookiePrefix: 'myapp' })).toBe(
-			'custom'
-		);
 		expect(
-			getToken(mockCookies({ '__Secure-myapp.convex_jwt': 'secure-custom' }), {
+			getToken(mockCookies({ 'myapp.session_token': 's', 'myapp.convex_jwt': 'custom' }), {
 				cookiePrefix: 'myapp'
 			})
+		).toBe('custom');
+		expect(
+			getToken(
+				mockCookies({
+					'__Secure-myapp.session_token': 's',
+					'__Secure-myapp.convex_jwt': 'secure-custom'
+				}),
+				{
+					cookiePrefix: 'myapp'
+				}
+			)
 		).toBe('secure-custom');
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
 	});
 
 	it('ignores default-named cookies when a custom cookiePrefix is set', () => {
-		const token = getToken(mockCookies({ 'better-auth.convex_jwt': 'default' }), {
-			cookiePrefix: 'myapp'
-		});
+		const token = getToken(
+			mockCookies({ 'myapp.session_token': 's', 'better-auth.convex_jwt': 'default' }),
+			{
+				cookiePrefix: 'myapp'
+			}
+		);
 
 		expect(token).toBeUndefined();
 	});
 
 	it('also accepts the dash separator, like Better Auth', () => {
-		expect(getToken(mockCookies({ 'myapp-convex_jwt': 'dash' }), { cookiePrefix: 'myapp' })).toBe(
-			'dash'
-		);
+		expect(
+			getToken(mockCookies({ 'myapp-session_token': 's', 'myapp-convex_jwt': 'dash' }), {
+				cookiePrefix: 'myapp'
+			})
+		).toBe('dash');
 	});
 
 	it('returns the token when primary cookie name matches', async () => {
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 
 		const token = await getToken(
 			mockCreateAuth,
-			mockCookies({ 'better-auth.convex_jwt': 'my-token' })
+			mockCookies({ 'better-auth.session_token': 's', 'better-auth.convex_jwt': 'my-token' })
 		);
 		expect(token).toBe('my-token');
 	});
 
 	it('removes nullish trusted origins before creating the cookie getter', async () => {
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 		const createAuth = (() => ({
 			options: {
 				trustedOrigins: ['https://app.example.com', null, undefined]
 			}
 		})) as never;
 
-		await getToken(createAuth, mockCookies({ 'better-auth.convex_jwt': 'my-token' }));
+		await getToken(
+			createAuth,
+			mockCookies({ 'better-auth.session_token': 's', 'better-auth.convex_jwt': 'my-token' })
+		);
 
 		expect(mockCreateCookieGetter).toHaveBeenCalledWith({
 			trustedOrigins: ['https://app.example.com']
@@ -115,16 +134,11 @@ describe('getToken', () => {
 
 	it('returns insecure fallback when expected secure cookie is missing', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: '__Secure-better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('__Secure-better-auth'));
 
 		const token = await getToken(
 			mockCreateAuth,
-			mockCookies({ 'better-auth.convex_jwt': 'insecure-token' })
+			mockCookies({ 'better-auth.session_token': 's', 'better-auth.convex_jwt': 'insecure-token' })
 		);
 
 		expect(token).toBe('insecure-token');
@@ -134,16 +148,14 @@ describe('getToken', () => {
 
 	it('returns secure fallback when expected insecure cookie is missing', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 
 		const token = await getToken(
 			mockCreateAuth,
-			mockCookies({ '__Secure-better-auth.convex_jwt': 'secure-token' })
+			mockCookies({
+				'__Secure-better-auth.session_token': 's',
+				'__Secure-better-auth.convex_jwt': 'secure-token'
+			})
 		);
 
 		expect(token).toBe('secure-token');
@@ -152,19 +164,47 @@ describe('getToken', () => {
 	});
 
 	it('returns undefined when neither cookie variant exists', async () => {
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 
 		const token = await getToken(mockCreateAuth, mockCookies({}));
 		expect(token).toBeUndefined();
 	});
 
+	/* A `/convex/token` answer that left the server before a sign-out and arrives after it
+	   sets the JWT cookie again; the session cookie is gone, so the request is signed out. */
+	it('returns undefined for a Convex token cookie without a session cookie', () => {
+		expect(getToken(mockCookies({ 'better-auth.convex_jwt': 'stale' }))).toBeUndefined();
+		expect(getToken(mockCookies({ '__Secure-better-auth.convex_jwt': 'stale' }))).toBeUndefined();
+		expect(
+			getToken(mockCookies({ 'better-auth.session_token': 's', 'myapp.convex_jwt': 'stale' }), {
+				cookiePrefix: 'myapp'
+			})
+		).toBeUndefined();
+	});
+
+	it('reads a renamed session cookie', () => {
+		const cookies = mockCookies({ 'better-auth.sid': 's', 'better-auth.convex_jwt': 'my-token' });
+		expect(getToken(cookies)).toBeUndefined();
+		expect(getToken(cookies, { sessionCookieName: 'sid' })).toBe('my-token');
+	});
+
+	it('returns undefined for a token cookie without a session cookie (createAuth overload)', async () => {
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
+
+		const token = await getToken(
+			mockCreateAuth,
+			mockCookies({ 'better-auth.convex_jwt': 'stale' })
+		);
+		expect(token).toBeUndefined();
+	});
+
 	it('supports split-runtime SSR by avoiding createAuth entirely when only cookies are passed', () => {
-		const token = getToken(mockCookies({ '__Secure-better-auth.convex_jwt': 'proxy-token' }));
+		const token = getToken(
+			mockCookies({
+				'__Secure-better-auth.session_token': 's',
+				'__Secure-better-auth.convex_jwt': 'proxy-token'
+			})
+		);
 
 		expect(token).toBe('proxy-token');
 		expect(mockCreateCookieGetter).not.toHaveBeenCalled();
@@ -196,29 +236,31 @@ describe('getAuthState', () => {
 
 	it('falls back to cookie-based getToken when no AsyncLocalStorage token', async () => {
 		mockGetServerToken.mockReturnValue(undefined);
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
+
+		const result = await getAuthState(
+			mockCreateAuth,
+			mockCookies({ 'better-auth.session_token': 's', 'better-auth.convex_jwt': 'cookie-token' })
 		);
+
+		expect(result).toEqual({ isAuthenticated: true });
+	});
+
+	it('is signed out with a Convex token cookie but no session cookie', async () => {
+		mockGetServerToken.mockReturnValue(undefined);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 
 		const result = await getAuthState(
 			mockCreateAuth,
 			mockCookies({ 'better-auth.convex_jwt': 'cookie-token' })
 		);
 
-		expect(result).toEqual({ isAuthenticated: true });
+		expect(result).toEqual({ isAuthenticated: false });
 	});
 
 	it('falls back to cookie-based and returns false when cookie is absent', async () => {
 		mockGetServerToken.mockReturnValue(undefined);
-		mockCreateCookieGetter.mockReturnValue(
-			() =>
-				({ name: 'better-auth.convex_jwt', attributes: {} }) as ReturnType<
-					ReturnType<typeof createCookieGetter>
-				>
-		);
+		mockCreateCookieGetter.mockReturnValue(cookieGetter('better-auth'));
 
 		const result = await getAuthState(mockCreateAuth, mockCookies({}));
 

@@ -7,9 +7,11 @@ import { getToken } from './index.js';
 
 // getToken(cookies) must find the Convex JWT cookie exactly where Better Auth's
 // own reader does, which @convex-dev/better-auth's getToken uses for other
-// frameworks. Unmocked, so a lookup change in Better Auth shows up here.
+// frameworks, and only while Better Auth's reader finds the session cookie: the
+// JWT cookie alone can outlive a sign-out. Unmocked, so a lookup change in Better
+// Auth shows up here.
 
-const jars: Record<string, string>[] = [
+const tokenJars: Record<string, string>[] = [
 	{},
 	{ 'better-auth.convex_jwt': 'a' },
 	{ '__Secure-better-auth.convex_jwt': 'b' },
@@ -19,6 +21,15 @@ const jars: Record<string, string>[] = [
 	{ '__Secure-myapp.convex_jwt': 'd' },
 	{ 'myapp-convex_jwt': 'e', 'better-auth.convex_jwt': 'f' }
 ];
+const sessionJars: Record<string, string>[] = [
+	{},
+	{ 'better-auth.session_token': 's' },
+	{ '__Secure-better-auth.session_token': 's' },
+	{ 'better-auth-session_token': 's' },
+	{ 'myapp.session_token': 's' },
+	{ '__Secure-myapp.session_token': 's' }
+];
+const jars = sessionJars.flatMap((session) => tokenJars.map((token) => ({ ...session, ...token })));
 
 const asCookies = (jar: Record<string, string>) =>
 	({ get: (name: string) => jar[name] }) as unknown as Cookies;
@@ -34,9 +45,10 @@ describe('getToken lookup parity with Better Auth getSessionCookie', () => {
 	for (const cookiePrefix of [undefined, 'myapp']) {
 		for (const jar of jars) {
 			it(`prefix ${cookiePrefix ?? '(default)'}, cookies ${JSON.stringify(jar)}`, () => {
-				const expected =
-					getSessionCookie(asHeaders(jar), { cookieName: JWT_COOKIE_NAME, cookiePrefix }) ??
-					undefined;
+				const headers = asHeaders(jar);
+				const expected = getSessionCookie(headers, { cookiePrefix })
+					? (getSessionCookie(headers, { cookieName: JWT_COOKIE_NAME, cookiePrefix }) ?? undefined)
+					: undefined;
 
 				expect(getToken(asCookies(jar), { cookiePrefix })).toBe(expected);
 			});
