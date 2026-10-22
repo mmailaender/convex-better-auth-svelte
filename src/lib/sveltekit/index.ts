@@ -29,12 +29,13 @@ export type GetTokenOptions = {
 	 */
 	cookiePrefix?: string;
 	/**
-	 * Name of Better Auth's session cookie without prefix, if your auth config renames it
-	 * (`advanced.cookies.session_token.name`). The token is only returned while this cookie
-	 * is present.
-	 * @default 'session_token'
+	 * Better Auth's session cookie, which must be present for the token to count. Give its
+	 * full name if your auth config renames it (`advanced.cookies.session_token.name`; the
+	 * `__Secure-` variant is found too), or `false` if the app authenticates without one
+	 * (an `externalSession`), so the Convex JWT cookie alone is the session.
+	 * @default Better Auth's `session_token` cookie under `cookiePrefix`
 	 */
-	sessionCookieName?: string;
+	sessionCookie?: string | false;
 };
 
 /**
@@ -123,11 +124,12 @@ export function getToken<DataModel extends GenericDataModel>(
 ): string | undefined | Promise<string | undefined> {
 	if (typeof createAuthOrCookies !== 'function') {
 		const options = cookiesOrOptions as GetTokenOptions | undefined;
-		const sessionCookieNames = getCookieNames(
-			options?.sessionCookieName ?? 'session_token',
-			options?.cookiePrefix
-		);
-		if (!hasSessionCookie(createAuthOrCookies, sessionCookieNames)) return undefined;
+		const sessionCookieNames =
+			options?.sessionCookie === undefined
+				? getCookieNames('session_token', options?.cookiePrefix)
+				: options.sessionCookie && [`__Secure-${options.sessionCookie}`, options.sessionCookie];
+		if (sessionCookieNames && !hasSessionCookie(createAuthOrCookies, sessionCookieNames))
+			return undefined;
 		return getTokenFromKnownCookieNames(
 			createAuthOrCookies,
 			getConvexJwtCookieNames(options?.cookiePrefix)

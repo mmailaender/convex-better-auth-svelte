@@ -182,10 +182,20 @@ describe('getToken', () => {
 		).toBeUndefined();
 	});
 
-	it('reads a renamed session cookie', () => {
-		const cookies = mockCookies({ 'better-auth.sid': 's', 'better-auth.convex_jwt': 'my-token' });
-		expect(getToken(cookies)).toBeUndefined();
-		expect(getToken(cookies, { sessionCookieName: 'sid' })).toBe('my-token');
+	// Better Auth's `advanced.cookies.session_token.name` replaces the whole name (Codex review)
+	it('reads a renamed session cookie by its full name', () => {
+		const plain = mockCookies({ sid: 's', 'better-auth.convex_jwt': 'my-token' });
+		const secure = mockCookies({ '__Secure-sid': 's', 'better-auth.convex_jwt': 'my-token' });
+		expect(getToken(plain)).toBeUndefined();
+		expect(getToken(plain, { sessionCookie: 'sid' })).toBe('my-token');
+		expect(getToken(secure, { sessionCookie: 'sid' })).toBe('my-token');
+	});
+
+	// an `externalSession` exchanges its own credential, so no session cookie exists (Codex review)
+	it('returns the token cookie alone when the app has no session cookie', () => {
+		expect(
+			getToken(mockCookies({ 'better-auth.convex_jwt': 'external' }), { sessionCookie: false })
+		).toBe('external');
 	});
 
 	it('returns undefined for a token cookie without a session cookie (createAuth overload)', async () => {
