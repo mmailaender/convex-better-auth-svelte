@@ -32,7 +32,8 @@ const getPathname = (input: RequestInfo | URL): string | undefined => {
 	}
 };
 
-const isQueryRequest = (input: RequestInfo | URL): boolean => {
+/** Whether a `fetch` input targets one of the Convex query endpoints. */
+export const isQueryRequest = (input: RequestInfo | URL): boolean => {
 	const pathname = getPathname(input);
 	return pathname !== undefined && RETRYABLE_PATHS.some((path) => pathname.endsWith(path));
 };

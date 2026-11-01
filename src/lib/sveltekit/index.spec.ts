@@ -264,10 +264,12 @@ describe('createConvexHttpClient', () => {
 		expect(forwardedOptions()?.fetch).not.toBe(customFetch);
 	});
 
-	it('forwards the custom fetch unwrapped when retryTransientQueries is false', () => {
+	it('forwards the custom fetch unwrapped when retries and the query deadline are off', () => {
 		const customFetch = vi.fn() as unknown as typeof globalThis.fetch;
 
-		createConvexHttpClient({ options: { fetch: customFetch, retryTransientQueries: false } });
+		createConvexHttpClient({
+			options: { fetch: customFetch, retryTransientQueries: false, queryTimeoutMs: false }
+		});
 
 		expect(forwardedOptions()?.fetch).toBe(customFetch);
 	});
@@ -284,12 +286,17 @@ describe('createConvexHttpClient', () => {
 		expect(mockConvexHttpClient.mock.calls[0]?.[0]).toBe('http://127.0.0.1:3210');
 	});
 
-	it('does not pass retryTransientQueries on to the client', () => {
+	it('does not pass retryTransientQueries or queryTimeoutMs on to the client', () => {
 		createConvexHttpClient({
-			options: { retryTransientQueries: false, skipConvexDeploymentUrlCheck: true }
+			options: {
+				retryTransientQueries: false,
+				queryTimeoutMs: false,
+				skipConvexDeploymentUrlCheck: true
+			}
 		});
 
 		expect(forwardedOptions()).not.toHaveProperty('retryTransientQueries');
+		expect(forwardedOptions()).not.toHaveProperty('queryTimeoutMs');
 		expect(forwardedOptions()?.skipConvexDeploymentUrlCheck).toBe(true);
 	});
 });

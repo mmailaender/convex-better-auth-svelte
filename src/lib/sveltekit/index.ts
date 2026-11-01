@@ -8,6 +8,7 @@ import type { GenericDataModel } from 'convex/server';
 import { _getServerToken } from 'convex-svelte/sveltekit';
 
 import { resolveConvexSiteUrl, resolveConvexUrl } from './convex-url.js';
+import { createQueryDeadlineFetch } from './query-deadline.js';
 import { createRetryingFetch } from './retrying-fetch.js';
 
 /**
@@ -230,16 +231,31 @@ export const createConvexHttpClient = (
 			 * repeated. Defaults to `true`; pass `false` to opt out.
 			 */
 			retryTransientQueries?: boolean;
+			/**
+			 * Fail a query request that has not finished after this whole number
+			 * of milliseconds, response body included, so a stalled connection
+			 * cannot hold an SSR load open. A timed-out query is not retried.
+			 * Mutations and actions have no deadline. Defaults to `10000`; pass
+			 * `false` to opt out.
+			 */
+			queryTimeoutMs?: number | false;
 		};
 	} = {}
 ) => {
-	const { fetch: customFetch, retryTransientQueries, ...options } = args.options ?? {};
+	const {
+		fetch: customFetch,
+		retryTransientQueries,
+		queryTimeoutMs = 10_000,
+		...options
+	} = args.options ?? {};
 	const baseFetch =
 		customFetch ??
 		((...fetchArgs: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...fetchArgs));
+	const boundedFetch =
+		queryTimeoutMs === false ? baseFetch : createQueryDeadlineFetch(baseFetch, queryTimeoutMs);
 	const client = new ConvexHttpClient(resolveConvexUrl(args.convexUrl), {
 		...options,
-		fetch: retryTransientQueries === false ? baseFetch : createRetryingFetch(baseFetch)
+		fetch: retryTransientQueries === false ? boundedFetch : createRetryingFetch(boundedFetch)
 	});
 	const token = args.token ?? _getServerToken();
 	if (token) client.setAuth(token);
