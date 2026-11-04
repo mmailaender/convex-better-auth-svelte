@@ -69,8 +69,9 @@ type CrossDomainAuthClient = AuthClient & {
 
 type FetchAccessToken = (options: { forceRefreshToken: boolean }) => Promise<string | null>;
 
-// Context key for sharing auth client and functions
-const AUTH_CONTEXT_KEY = Symbol('auth-context');
+// Context key for sharing auth client and functions. Symbol.for keeps the key
+// identical when Vite's dev SSR runner evaluates this module more than once.
+const AUTH_CONTEXT_KEY = Symbol.for('@mmailaender/convex-better-auth-svelte/auth-context');
 
 type BetterAuthContext = {
 	authClient: AuthClient;
