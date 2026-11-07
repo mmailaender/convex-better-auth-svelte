@@ -418,6 +418,7 @@ describe('createSvelteKitHandler', () => {
 				origin: 'https://app.example.com',
 				referer: 'https://app.example.com/sign-in',
 				'user-agent': 'Mozilla/5.0',
+				'accept-language': 'de-DE,de;q=0.9,en;q=0.8',
 				'x-custom-debug': 'should-not-forward'
 			}
 		});
@@ -433,6 +434,7 @@ describe('createSvelteKitHandler', () => {
 		expect(capturedRequest!.headers.get('origin')).toBe('https://app.example.com');
 		expect(capturedRequest!.headers.get('referer')).toBe('https://app.example.com/sign-in');
 		expect(capturedRequest!.headers.get('user-agent')).toBe('Mozilla/5.0');
+		expect(capturedRequest!.headers.get('accept-language')).toBe('de-DE,de;q=0.9,en;q=0.8');
 		expect(capturedRequest!.headers.get('accept-encoding')).toBe('identity');
 		expect(capturedRequest!.headers.get('x-custom-debug')).toBeNull();
 	});
@@ -486,5 +488,76 @@ describe('createSvelteKitHandler', () => {
 		expect(capturedRequest!.headers.get('connection')).toBeNull();
 		expect(capturedRequest!.headers.get('keep-alive')).toBeNull();
 		expect(capturedRequest!.headers.get('x-custom-hop')).toBeNull();
+	});
+
+	describe('forwardHeaders', () => {
+		const event = (headers: Record<string, string> = {}) =>
+			({
+				request: new Request('https://app.example.com/api/auth/sign-in/email', {
+					method: 'POST',
+					headers: { host: 'app.example.com', ...headers }
+				}),
+				getClientAddress: () => '198.51.100.7'
+			}) as Parameters<ReturnType<typeof createSvelteKitHandler>['POST']>[0];
+
+		it('adds the headers it returns, computed from the request event', async () => {
+			const forwardHeaders = vi.fn((requestEvent: { getClientAddress: () => string }) => ({
+				'x-client-ip': requestEvent.getClientAddress(),
+				'x-proxy-secret': 'shared-secret'
+			}));
+			const { POST } = createSvelteKitHandler({
+				convexSiteUrl: 'https://convex.example.com',
+				forwardHeaders
+			});
+
+			await POST(event());
+
+			expect(forwardHeaders).toHaveBeenCalledOnce();
+			expect(capturedRequest!.headers.get('x-client-ip')).toBe('198.51.100.7');
+			expect(capturedRequest!.headers.get('x-proxy-secret')).toBe('shared-secret');
+		});
+
+		it('replaces a value the client sent under the same name', async () => {
+			const { POST } = createSvelteKitHandler({
+				convexSiteUrl: 'https://convex.example.com',
+				forwardHeaders: () => ({ authorization: 'Bearer from-the-app' })
+			});
+
+			await POST(event({ authorization: 'Bearer from-the-client' }));
+
+			expect(capturedRequest!.headers.get('authorization')).toBe('Bearer from-the-app');
+		});
+
+		it('cannot replace the headers the handler sets itself', async () => {
+			const { POST } = createSvelteKitHandler({
+				convexSiteUrl: 'https://convex.example.com',
+				forwardHeaders: () => ({
+					host: 'evil.example.com',
+					'x-forwarded-proto': 'http',
+					'x-better-auth-forwarded-host': 'evil.example.com',
+					'x-better-auth-forwarded-proto': 'http',
+					'accept-encoding': 'gzip'
+				})
+			});
+
+			await POST(event());
+
+			expect(capturedRequest!.headers.get('host')).toBe('convex.example.com');
+			expect(capturedRequest!.headers.get('x-forwarded-proto')).toBe('https');
+			expect(capturedRequest!.headers.get('x-better-auth-forwarded-host')).toBe('app.example.com');
+			expect(capturedRequest!.headers.get('x-better-auth-forwarded-proto')).toBe('https');
+			expect(capturedRequest!.headers.get('accept-encoding')).toBe('identity');
+		});
+
+		it('adds nothing when it returns undefined', async () => {
+			const { POST } = createSvelteKitHandler({
+				convexSiteUrl: 'https://convex.example.com',
+				forwardHeaders: () => undefined
+			});
+
+			await POST(event({ 'x-client-ip': '203.0.113.9' }));
+
+			expect(capturedRequest!.headers.get('x-client-ip')).toBeNull();
+		});
 	});
 });

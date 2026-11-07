@@ -1,6 +1,6 @@
 import { createCookieGetter } from 'better-auth/cookies';
 import type { BetterAuthOptions } from 'better-auth';
-import type { Cookies, RequestHandler } from '@sveltejs/kit';
+import type { Cookies, RequestEvent, RequestHandler } from '@sveltejs/kit';
 import { JWT_COOKIE_NAME } from '@convex-dev/better-auth/plugins';
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
 import type { CreateAuth, GenericCtx } from '@convex-dev/better-auth';
@@ -42,6 +42,8 @@ const getConvexJwtCookieNames = (cookiePrefix = 'better-auth') =>
 	});
 const FORWARDED_AUTH_HEADER_NAMES = new Set([
 	'accept',
+	// the browser's languages, for Better Auth callbacks that localize (emails, for example)
+	'accept-language',
 	'authorization',
 	'better-auth-cookie',
 	'content-type',
@@ -51,13 +53,23 @@ const FORWARDED_AUTH_HEADER_NAMES = new Set([
 	'user-agent'
 ]);
 
-const buildForwardedAuthHeaders = (headers: Headers, nextUrl: string, requestUrl: URL) => {
+const buildForwardedAuthHeaders = (
+	headers: Headers,
+	nextUrl: string,
+	requestUrl: URL,
+	extraHeaders?: HeadersInit
+) => {
 	const forwardedHeaders = new Headers();
 
 	for (const [headerName, headerValue] of headers.entries()) {
 		if (FORWARDED_AUTH_HEADER_NAMES.has(headerName.toLowerCase())) {
 			forwardedHeaders.set(headerName, headerValue);
 		}
+	}
+	// After the allowlist, so they replace a value the client sent under the same name; before
+	// the headers below, which the handler alone decides.
+	for (const [headerName, headerValue] of new Headers(extraHeaders).entries()) {
+		forwardedHeaders.set(headerName, headerValue);
 	}
 
 	forwardedHeaders.set('host', new URL(nextUrl).host);
@@ -246,12 +258,21 @@ export const createConvexHttpClient = (
 	return client;
 };
 
-const handler = (request: Request, opts?: { convexSiteUrl?: string }) => {
+const handler = (
+	request: Request,
+	opts?: { convexSiteUrl?: string },
+	extraHeaders?: HeadersInit
+) => {
 	const requestUrl = new URL(request.url);
 	const convexSiteUrl = resolveConvexSiteUrl(opts?.convexSiteUrl);
 	const nextUrl = `${convexSiteUrl}${requestUrl.pathname}${requestUrl.search}`;
 	const newRequest = new Request(nextUrl, request);
-	const forwardedHeaders = buildForwardedAuthHeaders(request.headers, nextUrl, requestUrl);
+	const forwardedHeaders = buildForwardedAuthHeaders(
+		request.headers,
+		nextUrl,
+		requestUrl,
+		extraHeaders
+	);
 
 	for (const headerName of [...newRequest.headers.keys()]) {
 		newRequest.headers.delete(headerName);
@@ -271,9 +292,28 @@ export const createSvelteKitHandler = (opts?: {
 	 * deployments.
 	 */
 	convexSiteUrl?: string;
+	/**
+	 * Headers to add to every request forwarded to Convex, computed from the
+	 * incoming request event. The handler forwards only the headers Better Auth
+	 * needs and drops the rest, including `x-forwarded-for` and `cf-connecting-ip`,
+	 * which a client can send itself or the platform may reject upstream. Use this
+	 * to pass what your app knows, for example the visitor's address from
+	 * `event.getClientAddress()` under a header your Convex auth route reads
+	 * (Better Auth's `advanced.ipAddress.ipAddressHeaders`).
+	 *
+	 * These headers replace a value the client sent under the same name. They
+	 * cannot replace `host`, `x-forwarded-proto`, `x-better-auth-forwarded-host`,
+	 * `x-better-auth-forwarded-proto` or `accept-encoding`, which the handler
+	 * sets itself.
+	 *
+	 * Convex's `.site` URL is public, so anyone can call it with any header.
+	 * Trust a header you add here only when the request also proves it came
+	 * through your app, for example with a shared secret your Convex route checks.
+	 */
+	forwardHeaders?: (event: RequestEvent) => HeadersInit | undefined;
 }) => {
-	const requestHandler: RequestHandler = async ({ request }) => {
-		return handler(request, opts);
+	const requestHandler: RequestHandler = async (event) => {
+		return handler(event.request, opts, opts?.forwardHeaders?.(event));
 	};
 
 	return {
